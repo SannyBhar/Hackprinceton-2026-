@@ -35,6 +35,15 @@ class Esp32WebSocketRobot:
     async def start(self) -> None:
         self._tasks.append(asyncio.create_task(self._connect_loop()))
 
+    async def close(self) -> None:
+        for task in self._tasks:
+            task.cancel()
+        await asyncio.gather(*self._tasks, return_exceptions=True)
+        self._tasks.clear()
+        if self._ws is not None:
+            await self._ws.close()
+        self._ws = None
+
     async def _connect_loop(self):
         import websockets  # provided by uvicorn[standard]
         while True:

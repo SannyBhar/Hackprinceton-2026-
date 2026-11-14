@@ -2,15 +2,15 @@
 from __future__ import annotations
 
 import json
-import os
 from pathlib import Path
 from typing import Optional
 
 from .models import ProjectorCalibration, Puzzle
 
-ROOT = Path(__file__).resolve().parents[2]
-DATA = Path(os.environ.get("CA_DATA_DIR", ROOT / "data"))
-FIXTURES = ROOT / "fixtures"
+from .settings import FIXTURES, ROOT, env_value
+
+# Preserve legacy imports and the direct Storage() default. Wiring resolves settings at startup.
+DATA = Path(env_value("DATA_DIR", str(ROOT / "data")))
 
 
 class Storage:

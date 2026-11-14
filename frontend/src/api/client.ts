@@ -1,5 +1,5 @@
 import type {
-  Instruction, ProjectionSettings, ProjectorCalibration, Puzzle, ScanResult,
+  Cell, Instruction, ProjectionSettings, ProjectorCalibration, Puzzle, ScanResult,
 } from './types';
 
 async function call<T>(method: string, path: string, body?: unknown): Promise<T> {
@@ -23,7 +23,7 @@ export const api = {
   setProjection: (p: ProjectionSettings) => call('PUT', '/api/projection', p),
   scan: () => call<ScanResult>('POST', '/api/scan'),
   validate: (instructions: Instruction[]) =>
-    call<{ ok: boolean; errors: string[] }>('POST', '/api/program/validate', { instructions }),
+    call<{ ok: boolean; errors: string[]; plannedEntries: Cell[] }>('POST', '/api/program/validate', { instructions }),
   confirm: (instructions: Instruction[]) => call('POST', '/api/program/confirm', { instructions }),
   run: () => call('POST', '/api/run'),
   stop: () => call('POST', '/api/stop'),
