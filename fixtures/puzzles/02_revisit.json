@@ -1,0 +1,13 @@
+{
+  "id": "back-and-forth",
+  "version": 1,
+  "name": "Peek and Return (revisit)",
+  "rows": 4, "cols": 5,
+  "startCell": {"row": 2, "col": 0},
+  "startHeading": "E",
+  "goalCell": {"row": 2, "col": 3},
+  "targetEntries": [
+    {"row": 2, "col": 1}, {"row": 2, "col": 2}, {"row": 1, "col": 2}, {"row": 2, "col": 2}, {"row": 2, "col": 3}
+  ],
+  "sceneryCells": [{"row": 0, "col": 0}, {"row": 0, "col": 4}, {"row": 3, "col": 4}]
+}

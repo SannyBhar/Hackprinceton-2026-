@@ -1,0 +1,10 @@
+{"note": "Correct program for fire-station; second number is low-confidence handwriting.",
+ "cards": [
+  {"order": 0, "cardId": 10, "op": "START"},
+  {"order": 1, "cardId": 20, "op": "FORWARD", "rawSteps": 2, "stepsConfidence": 0.97},
+  {"order": 2, "cardId": 70, "op": "RIGHT"},
+  {"order": 3, "cardId": 21, "op": "FORWARD", "rawSteps": 3, "stepsConfidence": 0.62},
+  {"order": 4, "cardId": 60, "op": "LEFT"},
+  {"order": 5, "cardId": 22, "op": "FORWARD", "rawSteps": 2, "stepsConfidence": 0.95},
+  {"order": 6, "cardId": 80, "op": "STOP"}
+ ]}

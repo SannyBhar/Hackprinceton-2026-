@@ -1,0 +1,8 @@
+node_modules/
+frontend/dist/
+backend/.venv/
+__pycache__/
+.pytest_cache/
+data/
+printables/
+.DS_Store
