@@ -57,6 +57,7 @@ class SimulatedRobot:
     async def close(self):
         if self._idle_task:
             self._idle_task.cancel()
+            await asyncio.gather(self._idle_task, return_exceptions=True)
 
     def place(self, row: int, col: int, heading_deg: float) -> None:
         self.x, self.y, self.heading = col + 0.5, row + 0.5, heading_deg % 360

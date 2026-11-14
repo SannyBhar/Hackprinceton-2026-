@@ -4,7 +4,7 @@ import type { Corner, Snapshot } from '../api/types';
 import { Board } from '../board/Board';
 import { THEMES } from '../board/themes';
 import { ErrorBox, Feed, TwoCol, useAction } from './common';
-import { openProjectionWindow } from './InstructorApp';
+import { openProjectionWindow } from '../projection/window';
 
 const LABELS = ['TL', 'TR', 'BR', 'BL'];
 

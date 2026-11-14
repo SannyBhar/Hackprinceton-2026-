@@ -1,3 +1,5 @@
+import { openProjectionWindow } from '../projection/window';
+export { openProjectionWindow } from '../projection/window';
 import { useState } from 'react';
 import { useSession } from '../api/useSession';
 import { LiveTab } from './LiveTab';
@@ -15,10 +17,6 @@ const TABS = [
 ] as const;
 type Tab = (typeof TABS)[number][0];
 
-export function openProjectionWindow() {
-  window.open('/projection', 'codeanywhere-projection', 'popup,width=1280,height=800');
-}
-
 export function InstructorApp() {
   const { snap, connected } = useSession();
   const [tab, setTab] = useState<Tab>('setup');
@@ -30,7 +28,7 @@ export function InstructorApp() {
   return (
     <div className="app">
       <header>
-        <h1>CodeAnywhere</h1>
+        <h1>Grassroot</h1>
         <span className={`state state-${snap.state}`}>{snap.state}</span>
         <span className="muted">{snap.puzzle.name} · v{snap.puzzle.version}</span>
         <span className="spacer" />

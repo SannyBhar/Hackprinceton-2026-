@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Optional, Protocol
 
 from ..models import ScannedCard, ScanResult
+from .camera import CameraSource, OpenCvCameraSource
 
 CORNER_IDS = {0: "TL", 1: "TR", 2: "BR", 3: "BL"}
 ROBOT_ID = 4
@@ -76,6 +77,11 @@ class FixtureCardRecognizer:
         return finalize(cards, f"fixture:{f.name}")
 
 
+class OcrPort(Protocol):
+    """Existing numeric-crop callback; no handwriting model is provided."""
+    def __call__(self, gray_crop: object) -> tuple[int | None, float]: ...
+
+
 class OpenCvCardRecognizer:
     """Single ordered horizontal row of cards, read left-to-right. Needs opencv-contrib-python.
 
@@ -84,17 +90,18 @@ class OpenCvCardRecognizer:
     """
     name = "opencv"
 
-    def __init__(self, camera_index: int = 0, ocr=None):
+    def __init__(self, camera_index: int = 0, ocr: OcrPort | None = None,
+                 camera: CameraSource | None = None):
         import cv2  # noqa: F401  (fail fast if not installed)
         self.camera_index = camera_index
+        self.camera = camera or OpenCvCameraSource()
         self.ocr = ocr  # callable(gray_crop) -> (int|None, confidence)
 
     def _grab(self) -> bytes:
         import cv2
-        cap = cv2.VideoCapture(self.camera_index)
-        for _ in range(5):  # let exposure settle
-            ok, frame = cap.read()
-        cap.release()
+        with self.camera.open(self.camera_index, "scan") as cap:
+            for _ in range(5):  # let exposure settle
+                ok, frame = cap.read()
         if not ok:
             raise RuntimeError("card camera frame grab failed")
         return cv2.imencode(".png", frame)[1].tobytes()

@@ -36,9 +36,7 @@ export function ProgramTab({ snap, onRun }: { snap: Snapshot; onRun: () => void 
   useEffect(() => {
     if (!program.length || missingNumbers) { setCheck(null); return; }
     const t = setTimeout(() => {
-      fetch('/api/program/validate', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ instructions: program }) })
-        .then((r) => r.json()).then(setCheck).catch(() => setCheck(null));
+      api.validate(program).then(setCheck).catch(() => setCheck(null));
     }, 150);
     return () => clearTimeout(t);
   }, [JSON.stringify(program), missingNumbers]);
