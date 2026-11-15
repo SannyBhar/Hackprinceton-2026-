@@ -28,3 +28,18 @@ def build_tracker(session: Session, settings: Settings):
     tracker = CameraTracker(session.puzzle.rows, session.puzzle.cols, settings.track_camera)
     tracker.on_pose = session.on_pose
     return tracker
+
+
+def build_board_camera(session: Session, settings: Settings):
+    """Markerless overhead-camera tracking. The camera only opens when started from the UI/API
+    (or automatically with CA_TRACKER=board-camera), so tests and sim runs never touch it."""
+    from .vision.board_camera import BoardCamera
+    cam = BoardCamera(
+        lambda: (session.puzzle.rows, session.puzzle.cols, session.calibration.markerMask,
+                 session.puzzle.startHeading),
+        session.camera_pose, settings.data_dir)
+    session.board_camera = cam
+    if settings.tracker == "board-camera":
+        cam.start_camera(settings.track_camera)
+        session.pose_source = "camera"
+    return cam

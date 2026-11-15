@@ -14,10 +14,10 @@ from typing import Literal, Optional
 from fastapi import FastAPI, File, HTTPException, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response, StreamingResponse
 from pydantic import BaseModel
 
-from .models import Instruction, ProjectionSettings, ProjectorCalibration, Puzzle
+from .models import Instruction, ProjectionSettings, ProjectorCalibration, Puzzle, SessionState
 from .robot.simulator import SimulatedRobot
 from .session import ConflictError, InvalidError, Session
 from .settings import ROOT
@@ -184,6 +184,119 @@ def sim_fault(body: FaultBody):
         r.link_up = body.linkUp
     session.log("warn", f"simulator fault injected: {body.model_dump(exclude_none=True)}")
     session.changed()
+    return {"ok": True}
+
+
+# ---------------------------------------------------------------- overhead camera (markerless)
+def _board_camera():
+    if session.board_camera is None:
+        raise HTTPException(503, "board camera service not running")
+    return session.board_camera
+
+
+class BoardCameraStartBody(BaseModel):
+    index: int = 0
+
+
+@app.post("/api/board-camera/start")
+def board_camera_start(body: BoardCameraStartBody):
+    try:
+        import cv2  # noqa: F401
+    except ImportError:
+        raise HTTPException(501, "OpenCV not installed: pip install -r backend/requirements-vision.txt")
+    _board_camera().start_camera(body.index)
+    session.log("info", f"camera {body.index} started")
+    session.changed()
+    return {"ok": True}
+
+
+@app.post("/api/board-camera/stop")
+async def board_camera_stop():
+    if session.pose_source == "camera":
+        await guard(session.set_pose_source, "robot")
+    _board_camera().stop_camera()
+    session.log("info", "camera stopped")
+    session.changed()
+    return {"ok": True}
+
+
+@app.get("/api/board-camera/status")
+def board_camera_status():
+    return _board_camera().status()
+
+
+@app.get("/api/board-camera/snapshot.jpg")
+async def board_camera_snapshot():
+    data = await asyncio.to_thread(_board_camera().camera.jpeg, 1920, 85)
+    if data is None:
+        raise HTTPException(404, "no camera frame yet")
+    return Response(data, media_type="image/jpeg", headers={"Cache-Control": "no-store"})
+
+
+@app.get("/api/board-camera/stream")
+async def board_camera_stream():
+    """MJPEG preview for the instructor (~12 fps, downscaled)."""
+    cam = _board_camera().camera
+
+    async def frames():
+        last = -1
+        while True:
+            if cam.frame is not None and cam.frame_count != last:
+                last = cam.frame_count
+                data = await asyncio.to_thread(cam.jpeg, 960, 70)
+                if data:
+                    yield b"--frame\r\nContent-Type: image/jpeg\r\n\r\n" + data + b"\r\n"
+            await asyncio.sleep(0.08)
+
+    return StreamingResponse(frames(), media_type="multipart/x-mixed-replace; boundary=frame")
+
+
+@app.post("/api/board-camera/calibrate")
+async def board_camera_calibrate():
+    """Show the test pattern, wait for fresh frames, find its border, then restore the board."""
+    cam = _board_camera()
+    if not cam.camera.running or cam.camera.frame is None:
+        raise HTTPException(409, "start the camera first")
+    if session.state in (SessionState.RUNNING, SessionState.RECORDING):
+        raise HTTPException(409, "can't calibrate while the robot is moving")
+    before = session.projection
+    cam.paused = True
+    try:
+        session.set_projection(before.model_copy(update={"testPattern": True, "calibrating": False}))
+        await asyncio.sleep(1.0)                       # projector + browser repaint
+        await cam.camera.wait_new_frames(8)            # camera exposure settles on the new image
+        frame = cam.camera.frame
+        try:
+            st = await asyncio.to_thread(cam.calibrate_from_frame, frame)
+        except ValueError as e:
+            raise HTTPException(400, str(e))
+    finally:
+        session.set_projection(before)
+        cam.paused = False
+    session.log("info", "camera calibrated from the projected test pattern")
+    session.changed()
+    return st
+
+
+class PoseSourceBody(BaseModel):
+    source: Literal["robot", "camera"]
+
+
+@app.put("/api/pose-source")
+async def pose_source(body: PoseSourceBody):
+    if body.source == "camera":
+        cam = _board_camera()
+        if not cam.camera.running:
+            raise HTTPException(409, "start the camera first")
+        if cam.calibration is None:
+            raise HTTPException(409, "calibrate the camera first")
+    await guard(session.set_pose_source, body.source)
+    return {"poseSource": session.pose_source}
+
+
+@app.post("/api/manual/start")
+async def manual_start():
+    await guard(session.start_manual_attempt)
     return {"ok": True}
 
 

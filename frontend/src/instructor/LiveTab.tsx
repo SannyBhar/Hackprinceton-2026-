@@ -35,6 +35,18 @@ export function LiveTab({ snap }: { snap: Snapshot }) {
             {a && <Blocks program={a.program} active={running ? a.instructionIndex : undefined} />}
           </Card>
 
+          <Card title="Hand-push test" subtitle="Push the robot along the route by hand to check tracking and when tiles light up. No motor commands are sent.">
+            {snap.poseSource !== 'camera' && <div className="note info">Switch “Robot position from” to Camera in Setup first.</div>}
+            <div className="row">
+              <button className="primary" disabled={running || snap.state === 'RECORDING' || snap.poseSource !== 'camera'}
+                      onClick={() => run(() => api.manualStart())}>Start hand-push test</button>
+              {running && a?.mode === 'manual' && <button className="stop" onClick={() => run(() => api.stop())}>End test</button>}
+            </div>
+            {a?.mode === 'manual' && <p className="muted small" style={{ margin: 0 }}>
+              Ends by itself when the last route cell is entered. Keep your hand behind the robot so the camera can see it.
+            </p>}
+          </Card>
+
           {a?.stopReason && (
             <div className={`result ${s?.success ? 'success' : a.stopReason === 'PROGRAM_COMPLETE' ? '' : 'fault'}`}>
               <b>{s?.success ? '🎉 Perfect route!' : REASON_TEXT[a.stopReason] ?? a.stopReason}</b>

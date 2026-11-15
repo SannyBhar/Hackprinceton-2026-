@@ -10,7 +10,7 @@ Structural refactor: [brief](docs/Grassroot_Codex_Structural_Refactor.md) ·
 Current architecture: [module map](docs/ARCHITECTURE.md) · [refactor notes and checks](docs/REFACTOR_NOTES.md) ·
 Legacy scope: [CodeAnywhere_MVP_Scope.md](CodeAnywhere_MVP_Scope.md) · Plan: [docs/BUILD_PLAN.md](docs/BUILD_PLAN.md) ·
 Defaults we chose: [docs/ASSUMPTIONS.md](docs/ASSUMPTIONS.md) · Projector setup: [docs/PROJECTION_SETUP.md](docs/PROJECTION_SETUP.md) ·
-Hardware: [docs/HARDWARE_CHECKLIST.md](docs/HARDWARE_CHECKLIST.md)
+Hardware: [docs/HARDWARE_CHECKLIST.md](docs/HARDWARE_CHECKLIST.md) · Overhead camera: [docs/CAMERA_SETUP.md](docs/CAMERA_SETUP.md)
 
 ## Quick start (simulator, no hardware)
 
@@ -85,7 +85,7 @@ docs/             build plan, assumptions, projection setup, hardware checklist
 | --- | --- | --- |
 | `CA_ROBOT` | `sim` (default) / `esp32` | `CA_ROBOT_URL=ws://192.168.4.1:81/` |
 | `CA_CARDS` | `fixture` (default) / `opencv` | `CA_CARD_CAMERA=0`; needs `requirements-vision.txt` |
-| `CA_TRACKER` | unset / `camera` | `CA_TRACK_CAMERA=1`; pose from overhead camera |
+| `CA_TRACKER` | unset / `camera` / `board-camera` | `CA_TRACK_CAMERA=1`; `camera` needs 4 physical corner markers, `board-camera` is markerless (see docs/CAMERA_SETUP.md) |
 
 **Status labels:** everything under "Tests" runs against the simulator. The ESP32 transport,
 firmware, OpenCV card reader and camera tracker are written but **not verified on hardware**.

@@ -36,6 +36,11 @@ export const api = {
     call('POST', '/api/recording/toggle', { grade, source }),
   recordAction: (action: 'FORWARD' | 'BACKWARD' | 'LEFT' | 'RIGHT') =>
     call<{ accepted: boolean }>('POST', '/api/recording/action', { action }),
+  boardCameraStart: (index: number) => call('POST', '/api/board-camera/start', { index }),
+  boardCameraStop: () => call('POST', '/api/board-camera/stop'),
+  boardCameraCalibrate: () => call('POST', '/api/board-camera/calibrate'),
+  setPoseSource: (source: 'robot' | 'camera') => call('PUT', '/api/pose-source', { source }),
+  manualStart: () => call('POST', '/api/manual/start'),
   simFault: (f: { lateralDrift?: number; trackingLossMs?: number; linkUp?: boolean }) =>
     call('POST', '/api/sim/fault', f),
 };

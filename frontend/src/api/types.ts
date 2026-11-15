@@ -51,7 +51,7 @@ export type AttemptSummary = {
   reachedGoal: boolean; success: boolean; details: string[];
 };
 export type Attempt = {
-  id: string; startedAt: number; endedAt?: number; puzzleId: string; puzzleVersion: number;
+  id: string; mode?: 'manual'; startedAt: number; endedAt?: number; puzzleId: string; puzzleVersion: number;
   program: Instruction[]; instructionIndex: number; events: VisitEvent[]; warnings: string[];
   stopReason: string | null; summary: AttemptSummary | null;
 };
@@ -78,8 +78,22 @@ export type Snapshot = {
   robot: { adapter: string; connected: boolean };
   recording: Recording;
   feed: { t: number; level: 'info' | 'warn' | 'error'; msg: string }[];
+  poseSource: 'robot' | 'camera';
+  boardCamera: BoardCameraStatus | null;
   tilePolicy: string;
   maxSteps: number;
+};
+
+/** Markerless overhead-camera tracking (board_camera.py). */
+export type BoardCameraStatus = {
+  cameraIndex: number | null; running: boolean; tracking: boolean; error: string | null;
+  fps: number; latencyMs: number; frameSize: [number, number] | null;
+  calibrated: boolean; calibratedAt: number | null;
+  boardToImage: number[] | null;   // 3x3 row-major: board (0..1) -> camera image (0..1)
+  detection: {
+    found: boolean; reason?: string | null; x?: number | null; y?: number | null;
+    area?: number | null; runnerUp?: number | null; bbox?: number[] | null;
+  };
 };
 
 export type WsMessage =

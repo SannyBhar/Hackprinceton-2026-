@@ -74,7 +74,34 @@ class Session:
 
         self.seq = 0
         self.subscribers: set[asyncio.Queue] = set()
-        self.robot.on_pose = self.on_pose
+        # Exactly one pose source feeds tracking/grading: the robot adapter (simulator) or the
+        # overhead camera. Never both - two disagreeing streams would fabricate cell entries.
+        self.pose_source: str = "robot"
+        self.board_camera: Any = None  # markerless BoardCamera, attached by the runtime
+        self.robot.on_pose = self._robot_pose
+
+    def _robot_pose(self, pose: RobotPose):
+        if self.pose_source == "robot":
+            self.on_pose(pose)
+
+    def camera_pose(self, pose: RobotPose):
+        if self.pose_source == "camera":
+            self.on_pose(pose)
+
+    def set_pose_source(self, source: str):
+        if source not in ("robot", "camera"):
+            raise InvalidError("pose source must be 'robot' or 'camera'")
+        self._require(S.IDLE, S.SCANNING, S.PROGRAM_READY, S.COMPLETED, S.STOPPED, S.FAULT,
+                      action="switch where the robot position comes from")
+        self.pose_source = source
+        self.pose = None  # never show the other source's last position as current
+        if self.board_camera is not None:
+            self.board_camera.reset_heading()
+        self.log("info", "robot position now comes from the " + ("camera" if source == "camera" else "robot adapter"))
+        self.changed()
+
+    def _is_manual(self) -> bool:
+        return bool(self.attempt and self.attempt.get("mode") == "manual")
 
     # ------------------------------------------------------------------ plumbing
     async def start(self):
@@ -126,6 +153,8 @@ class Session:
             "robot": {"adapter": self.robot.name, "connected": self.robot.connected},
             "recording": self.recording,
             "feed": self.feed[-25:],
+            "poseSource": self.pose_source,
+            "boardCamera": self.board_camera.status() if self.board_camera is not None else None,
             "tilePolicy": self.tile_policy,
             "maxSteps": self.max_steps,
         }
@@ -208,6 +237,8 @@ class Session:
         cell = Cell(row=int(p.y), col=int(p.x))
         if cell != self.puzzle.startCell:
             raise ConflictError(f"robot is at {cell.key()}, not at start {self.puzzle.startCell.key()}")
+        if self.pose_source == "camera":
+            return  # markerless camera tracking can't observe heading; the instructor confirms it
         diff = abs((p.headingDeg - HEADING_DEG[self.puzzle.startHeading] + 180) % 360 - 180)
         if diff > 30:
             raise ConflictError(f"robot heading {p.headingDeg:.0f}° does not match start heading "
@@ -286,6 +317,10 @@ class Session:
         self.changed()
 
     async def operational_stop(self, reason: StopReason):
+        if self.state == S.RUNNING and self._is_manual():
+            self.log("info", f"hand-push test ended: {reason.value}")
+            self._finish(reason)
+            return
         if self.state == S.RUNNING:
             if self._stop_reason is None:
                 self._stop_reason = reason
@@ -318,7 +353,7 @@ class Session:
                     self.attempt["warnings"].append(w)
             if out.entered:
                 self._on_entry(out.entered, pose.timestampMs)
-            if out.boundary:
+            if out.boundary and not self._is_manual():
                 asyncio.get_event_loop().create_task(self.operational_stop(StopReason.BOUNDARY))
         self._publish("pose", pose.model_dump())
 
@@ -335,12 +370,38 @@ class Session:
             if self.attempt:
                 self.attempt["events"].append(ev.model_dump(mode="json"))
             self.changed()
+            if self._is_manual() and self.grader.index == len(self.puzzle.targetEntries):
+                self._finish(StopReason.PROGRAM_COMPLETE)  # every route step has been entered
+
+    async def start_manual_attempt(self):
+        """Grade the route while the robot is pushed by hand. No motor commands are sent.
+        For checking camera tracking and tile timing before the motors are wired."""
+        self._require(S.IDLE, S.PROGRAM_READY, S.COMPLETED, S.STOPPED, S.FAULT,
+                      action="start a hand-push test")
+        self._check_start_pose()
+        attempt_id = uuid.uuid4().hex[:10]
+        self._clear_feedback()
+        self.grader = Grader(attempt_id, self.puzzle.targetEntries)
+        self.detector = CellEntryDetector(self.puzzle.rows, self.puzzle.cols,
+                                          self.puzzle.startCell, self.tracker_cfg)
+        self.detector.last_valid_ms = now_ms()
+        self.attempt = {
+            "id": attempt_id, "mode": "manual", "startedAt": now_ms(), "puzzleId": self.puzzle.id,
+            "puzzleVersion": self.puzzle.version, "program": [], "instructionIndex": -1,
+            "events": [], "warnings": [], "stopReason": None, "summary": None,
+        }
+        self._stop_reason = None
+        self.state = S.RUNNING
+        self.log("info", f"hand-push test {attempt_id} started (no motor commands)")
+        self.changed()
 
     async def _watchdog(self):
         while True:
             await asyncio.sleep(0.1)
             if self.state not in (S.RUNNING, S.RECORDING):
                 continue
+            if self._is_manual():
+                continue  # no motors move in a hand-push test, so nothing to stop for safety
             if not self.robot.connected:
                 await self.operational_stop(StopReason.CONNECTION_LOST)
             elif self.detector and self.detector.is_stale(now_ms()):

@@ -6,6 +6,7 @@ import { CalibrationPad, keystone } from '../calibration/CalibrationPad';
 import { THEMES } from '../board/themes';
 import { BoardCard, Card, ErrorBox, Feed, TwoCol, useAction } from './common';
 import { openProjectionWindow } from '../projection/window';
+import { CameraCard } from './CameraCard';
 
 const LABELS = ['TL', 'TR', 'BR', 'BL'];
 
@@ -99,6 +100,8 @@ export function SetupTab({ snap }: { snap: Snapshot }) {
             <label className="check"><input type="checkbox" checked={cal.showGrid}
               onChange={(e) => run(() => api.saveCalibration({ ...cal, showGrid: e.target.checked }))} /> Grid lines</label>
           </Card>
+
+          <CameraCard snap={snap} step="4" />
 
           <Card title="Rover" subtitle={`${snap.robot.adapter} · ${snap.robot.connected ? 'connected' : 'not connected'}`}>
             {sim ? (
