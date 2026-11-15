@@ -28,6 +28,7 @@ export const api = {
   createStudent: (name:string) => call<Student>('POST','/api/students',{name}),
   selectStudent: (studentId:string|null) => call('PUT','/api/student',{studentId}),
   attempts: (studentId?:string) => call<Attempt[]>('GET','/api/attempts'+(studentId?'?studentId='+encodeURIComponent(studentId):'')),
+  setRecordingGrade: (grade:boolean) => call('PUT','/api/recording/options',{grade}),
   recordings: () => call<Recording[]>('GET','/api/recordings'),
   importRecording: (record:unknown) => call('POST','/api/recordings/import',record),
   confirmRecording: (id:string,reviewed:boolean) => call('POST',`/api/recordings/${encodeURIComponent(id)}/confirm`,{reviewed}),

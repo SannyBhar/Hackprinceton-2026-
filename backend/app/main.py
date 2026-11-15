@@ -170,7 +170,7 @@ class FaultBody(BaseModel):
 
 
 @app.post("/api/sim/fault")
-def sim_fault(body: FaultBody):
+async def sim_fault(body: FaultBody):
     r = session.robot
     if not isinstance(r, SimulatedRobot):
         raise HTTPException(400, "fault injection only available with the simulator")

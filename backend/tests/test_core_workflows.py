@@ -65,3 +65,19 @@ def test_library_and_review_api(tmp_path, monkeypatch):
         assert c.post('/api/program/confirm', json={**body, 'scanId': scan['scanId'], 'reviewed': True}).status_code == 200
         assert c.delete('/api/scan').status_code == 200
         assert c.post('/api/program/confirm', json=body).status_code == 200
+
+
+async def test_slow_subscriber_is_closed_for_resnapshot(tmp_path):
+    s=make_session(tmp_path)
+    q=asyncio.Queue(maxsize=512)
+    s.subscribers.add(q)
+    for _ in range(501):q.put_nowait({})
+    s.changed()
+    assert q not in s.subscribers and await q.get() is None
+
+
+async def test_snapshot_sequence_matches_envelope(tmp_path):
+    s=make_session(tmp_path);q=asyncio.Queue();s.subscribers.add(q)
+    s.changed();message=await q.get()
+    assert message['seq']==message['payload']['seq']
+    assert message['sessionId']==s.session_id

@@ -51,7 +51,7 @@ export function RecordingTab({ snap }: { snap: Snapshot }) {
           <Card title="Drive to write code"
                 subtitle="A student drives with the joystick; the app writes the matching cards. It shows the route they drove — not necessarily the only solution.">
             <label className="check"><input type="checkbox" checked={grade} disabled={recording}
-              onChange={(e) => setGrade(e.target.checked)} /> Also grade against this puzzle's route</label>
+              onChange={(e) => {setGrade(e.target.checked);run(() => api.setRecordingGrade(e.target.checked));}} /> Also grade against this puzzle's route</label>
             <div className="row">
               <button className={recording ? 'stop big' : 'go big'} onClick={() => run(() => api.toggleRecording(grade, 'ui'))}>
                 {recording ? '■ Stop recording' : '● Start recording'}

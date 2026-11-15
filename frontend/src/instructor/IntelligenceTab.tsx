@@ -34,14 +34,14 @@ export function IntelligenceTab({snap}:{snap:Snapshot}) {
     <Card title="Progress and next challenge" subtitle="Select a student in History. Recommendations require instructor approval and never move the robot.">
       <button disabled={!snap.studentId} onClick={()=>run(progress)}>Refresh progress</button>
       {report&&<>
-        <p>{report.synthetic?'SYNTHETIC DEMONSTRATION DATA':'Actual recorded attempts'} · {report.limitations}</p>
-        <div className="row">{report.skills.map(s=><label key={s.skill}>{s.skill} <meter min={0} max={1} value={s.estimate}/>{Math.round(s.estimate*100)}% · {s.evidenceCount} observations{s.uncertain?' · uncertain':''}</label>)}</div>
+        <p>{report.synthetic?'SYNTHETIC DEMONSTRATION DATA':'Recorded session attempts (may include simulator)'} · {report.limitations}</p>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(200px,1fr))',gap:16}}>{report.skills.map(s=><label key={s.skill}>{s.skill} <meter min={0} max={1} value={s.estimate}/>{Math.round(s.estimate*100)}% · {s.evidenceCount} observations{s.uncertain?' · uncertain':''}</label>)}</div>
         <p>{report.excludedOperationalOrUnattributed} operational/unattributed attempts excluded.</p>
         <div aria-label="Attempt accuracy trend">{report.trend.map(t=><div key={t.attemptId} className="row"><span>{new Date(t.startedAt).toLocaleString()}</span><meter min={0} max={Math.max(1,t.entries)} value={t.correct}/><span>{t.correct}/{t.entries}</span></div>)}</div>
       </>}
-      {suggestions.map(r=><div key={r.puzzle.id}><p>{r.explanation}</p><Board puzzle={r.puzzle} roverAtStart width={350} />
+      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(260px,1fr))',gap:20}}>{suggestions.map(r=><div key={r.puzzle.id}><p>{r.explanation}</p><Board puzzle={r.puzzle} roverAtStart width="100%" height="auto" />
         <button disabled={moving} onClick={()=>run(()=>api.savePuzzle(r.puzzle))}>Approve & load challenge</button>
-      </div>)}
+      </div>)}</div>
     </Card><ErrorBox error={error}/>
   </>;
 }

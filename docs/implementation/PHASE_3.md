@@ -41,3 +41,12 @@ history, and theme-failure UI. Theme browser fixture is explicitly mocked. Chrom
 could not start under macOS sandbox Mach-port restrictions; browser tests run outside that
 sandbox. Hardware, optical alignment, real serial wiring and live provider acceptance remain
 PENDING. Neither firmware image was flashed. See ACCEPTANCE_MATRIX.md for source coverage.
+
+
+Final hardening: snapshot payload/envelope sequences now agree; slow consumers are closed with
+1013 and resnapshot on reconnect. Older poses cannot overwrite newer ones. Robot connections
+have one client owner, integer primitives and bounded payloads. The firmware ID ledger retains
+128 accepted discrete IDs without eviction; once full, it rejects motion until a stopped power
+cycle. STOP is still accepted. Disconnected transport STOP does not prevent session cleanup;
+the independent firmware watchdog/drive expiry remains the fallback. Unified GRASSROOT_CAMERA
+selects one webcam, with explicit legacy camera variable fallbacks.

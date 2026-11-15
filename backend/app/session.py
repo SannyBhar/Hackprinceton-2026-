@@ -63,6 +63,7 @@ class Session:
         self.detector: Optional[CellEntryDetector] = None
         self.feed: list[dict] = []
         self.recording: dict[str, Any] = {"actions": [], "generated": None, "warnings": [], "path": []}
+        self.recording_grade = False
         self._rec_current: Optional[RecordedAction] = None
         self._rec_lock = asyncio.Lock()
         self._last_toggle = 0
@@ -322,7 +323,7 @@ class Session:
                                           self.puzzle.startCell, self.tracker_cfg)
         self.detector.last_valid_ms = now_ms()  # arm the stale watchdog from Run time
         self.attempt = {
-            "id": attempt_id, "studentId": self.student_id, "startedAt": now_ms(), "puzzleId": self.puzzle.id,
+            "id": attempt_id, "source": self.robot.name, "studentId": self.student_id, "startedAt": now_ms(), "puzzleId": self.puzzle.id,
             "puzzleSnapshot": self.puzzle.model_dump(mode="json"), "commands": [],
             "scanReview": self.scan.model_dump(mode="json") if self.scan else None,
             "puzzleVersion": self.puzzle.version,
@@ -524,6 +525,9 @@ class Session:
         gen = generate_program(actions, self.max_steps)
         self.recording["generated"] = [i.model_dump(mode="json") for i in gen.instructions]
         self.recording["warnings"] += gen.warnings
+        if self.grader:
+            self.recording["visitEvents"] = [e.model_dump(mode="json") for e in self.grader.events]
+            self.recording["summary"] = summarize(self.puzzle.targetEntries,self.grader.events,self.puzzle.goalCell,True).__dict__
         self.recording["endedAt"] = now_ms()
         self.persist(self.storage.put_record, "recordings", self.recording["id"], self.recording)
         self.state = S.IDLE if not self.program else S.PROGRAM_READY

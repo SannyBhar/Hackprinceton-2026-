@@ -14,8 +14,9 @@ Known software limits: open-loop discrete motion needs measured calibration; con
 is approximate; BKT is an illustrative estimator with explicit uncertainty; OCR requires manual
 review and has not been tuned against actual cards. Native camera reads can delay teardown;
 STOP bypasses acquisition. Continuous input has a bounded buffer and stops at its duration limit.
-Duplicate IDs are retained in bounded MCU memory during a powered session; a power cycle clears
-that history, so the backend does not reconnect/retry an interrupted run.
+Duplicate IDs are retained without eviction for up to 128 accepted discrete commands per
+powered session. A full ledger rejects further motion until a stopped power cycle; it never
+re-executes an old ID. A power cycle clears history; the backend never retries an interrupted run.
 
 | Source line | Requirement / section | Phase | Implementation / verification | Acceptance status |
 | --- | --- | --- | --- | --- |

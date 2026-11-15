@@ -141,3 +141,7 @@ These notes distinguish implemented software from still-pending physical accepta
 Existing README "refactor status" describes the earlier milestone only; the three implementation
 notes above supersede its feature-status statements. Physical testing, actual-card OCR accuracy,
 and live Gemini acceptance are not implied by software test success.
+
+Frontend development now requires **Node >=22.12.0**. The Phase 3 dependency-maintenance commit
+updates affected tooling/router packages; the verified npm audit reports zero advisories.
+See [dependency notes](docs/implementation/DEPENDENCIES.md).

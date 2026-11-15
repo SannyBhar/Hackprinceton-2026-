@@ -23,7 +23,7 @@ async def running_session(session: Session):
             session._bg.append(asyncio.create_task(session.joystick.serial_loop(cfg.joystick_port)))
         if cfg.cards == "opencv" or cfg.tracker == "camera":
             from .vision.coordinator import CameraCoordinator
-            session.camera = CameraCoordinator(session, cfg.card_camera, cfg.data_dir)
+            session.camera = CameraCoordinator(session, cfg.camera_index, cfg.data_dir)
             if session.robot.name == "simulator":
                 session.robot.on_pose = None  # physical camera is the exclusive pose source
             await session.camera.switch("scan")

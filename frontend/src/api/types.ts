@@ -52,6 +52,7 @@ export type AttemptSummary = {
   reachedGoal: boolean; success: boolean; details: string[];
 };
 export type Attempt = {
+  source?: string;
   id: string; startedAt: number; endedAt?: number; puzzleId: string; puzzleVersion: number;
   program: Instruction[]; instructionIndex: number; events: VisitEvent[]; warnings: string[];
   stopReason: string | null; summary: AttemptSummary | null;

@@ -13,6 +13,10 @@ class StudentBody(BaseModel):
     synthetic: bool = False
 
 
+class RecordingOptions(BaseModel):
+    grade: bool = False
+
+
 class SelectionBody(BaseModel):
     studentId: str | None = None
 
@@ -79,6 +83,13 @@ def router(get_session):
             s.scan=None
             s.confirm_program([Instruction.model_validate(i) for i in record['generated']])
         except (ConflictError,InvalidError,ValueError) as e: raise HTTPException(400,str(e))
+        return {'ok':True}
+
+    @api.put('/recording/options')
+    async def options(body:RecordingOptions):
+        s=get_session()
+        if s.state.value in ('RUNNING','RECORDING'):raise HTTPException(409,'stop before changing recording options')
+        s.recording_grade=body.grade
         return {'ok':True}
 
     @api.post('/joystick/sample')

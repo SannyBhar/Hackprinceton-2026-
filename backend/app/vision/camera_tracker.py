@@ -66,10 +66,11 @@ class CameraTracker:
         q = robot[0]
         h, w = gray.shape
         centre = q.mean(axis=0)
+        front = (q[0] + q[1]) / 2  # marker top edge faces robot front
         if self.height_correction:
             c0 = np.array([w / 2, h / 2])
             centre = c0 + (centre - c0) * (1 - self.height_correction)
-        front = (q[0] + q[1]) / 2  # marker top edge faces robot front
+            front = c0 + (front - c0) * (1 - self.height_correction)
         g = cv2.perspectiveTransform(np.array([[centre, front]], np.float32), self.H)[0]
         dx, dy = g[1] - g[0]
         heading = (math.degrees(math.atan2(dx, -dy)) + 360) % 360

@@ -86,3 +86,12 @@ async def test_tracker_uses_camera_boundary_and_releases_on_cancel():
     task.cancel()
     await asyncio.gather(task, return_exceptions=True)
     assert roles == [(1, 'track')] and released == [True]
+
+
+async def test_dead_transport_stop_does_not_break_cleanup():
+    from app.robot.esp32_ws import Esp32WebSocketRobot
+    class Dead:
+        async def send(self,*args):raise OSError('connection closed')
+    r=Esp32WebSocketRobot('ws://unused');r._ws=Dead();r.continuous_supported=True
+    await r.stop('operator stop')
+    assert not r.connected and not r.continuous_supported

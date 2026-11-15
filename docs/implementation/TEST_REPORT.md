@@ -12,9 +12,9 @@ to an earlier completed pass; this implementation follows the approved full-proj
 | Phase 1 firmware | Robot PlatformIO build passed (disabled outputs) |
 | Phase 2 backend / frontend | 55 / 8 passed; build/typecheck passed |
 | Phase 2 firmware | Robot + joystick PlatformIO builds passed |
-| Phase 3 backend | 60 passed before final hardening; see final PR validation for latest count |
+| Phase 3 backend | 63 passed after final hardening |
 | Phase 3 frontend | 8 passed; build/typecheck passed |
-| Browser workflows | Initial 2 workflows passed after resolving a test locator; final suite also includes provider-failure fixture |
+| Browser workflows | 3 passed, including provider-failure fixture; Chromium ran outside sandbox |
 | Local model | TrOCR loaded and inferred real output on synthetic crop; ambiguous output correctly rejected |
 | Hardware / live Gemini | NOT RUN: no accessible verified devices/wiring or configured provider acceptance credentials |
 
@@ -29,3 +29,8 @@ browser suite ran outside that sandbox. The initial browser selector ambiguity w
 an exact Student label. Backend development failures (a stray persistence log and simulator
 continuous lease detection) were fixed and covered. One Starlette/AnyIO deprecation warning
 remains from existing dependencies. No new hardware functionality was tested on real equipment.
+
+Final audit after separate frontend maintenance: 0 npm vulnerabilities. Backend compileall and
+relative-import graph checks passed (no Python/TypeScript relative-import cycles). Final firmware
+robot/joystick builds passed. Node >=22.12.0 now required; verified Node 24.4.1. No tests left
+failing in the final software suite. Physical/live-provider gates remain explicitly incomplete.
