@@ -22,6 +22,8 @@ const char* AP_SSID = "codeanywhere-robot";
 const char* AP_PASS = "change-me-please";   // >= 8 chars
 WebSocketsServer ws(81);
 
+// Proposed XIAO pin constants: hardware_pins.h; wiring: docs/ESP32_MOTOR_WIRING.md.
+// Reference only for now: active pins stay disabled; no motor integration in this change.
 // ---------- motor driver pins: TODO confirm (two DRV8833 = 4 H-bridges) ----------
 // Order: front-left, front-right, rear-left, rear-right. Each motor uses IN1/IN2 PWM.
 const int MOTOR_IN1[4] = {-1, -1, -1, -1};  // TODO

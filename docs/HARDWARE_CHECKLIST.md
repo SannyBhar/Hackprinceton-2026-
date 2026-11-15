@@ -2,6 +2,10 @@
 
 Tick items only when actually performed. Do not report unperformed tests as passed.
 
+Proposed XIAO ESP32-S3 pin mapping: [motor wiring reference](ESP32_MOTOR_WIRING.md).
+Constants are recorded in `firmware/esp32/codeanywhere/hardware_pins.h`; active
+firmware outputs remain disabled pending a separately authorized integration.
+
 ## Before wiring (ME-1)
 - [ ] Exact motor model, rated voltage, no-load and **stall** current measured/confirmed
 - [ ] Stall current within DRV8833 limits (≈1.5 A RMS / 2 A peak per channel) — else choose another driver
