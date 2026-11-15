@@ -70,7 +70,8 @@ export type CameraStatus = { role: string; generation: number; calibrated: boole
 
 export type Snapshot = {
   studentId: string | null;
-  joystick: {active:boolean;error:string|null};
+  joystick: {active:boolean;error:string|null;connected?:boolean;armed?:boolean;fresh?:boolean;ageMs?:number|null;protocolVersion?:number|null;source?:string|null};
+  deviceOperation?: string | null;
   sessionId: string;
   camera: CameraStatus | null;
   seq: number;
@@ -85,7 +86,7 @@ export type Snapshot = {
   attemptHistory: Pick<Attempt, 'id' | 'startedAt' | 'stopReason' | 'summary'>[];
   tiles: Record<string, TileState>;
   pose: RobotPose | null;
-  robot: { adapter: string; connected: boolean; continuousSupported?: boolean };
+  robot: { adapter: string; connected: boolean; continuousSupported?: boolean; readiness?: {ready:boolean;mode?:string;error?:string|null;remainingCommands?:number;profileId?:string;outputsEnabled?:boolean;calibrated?:boolean} };
   recording: Recording;
   feed: { t: number; level: 'info' | 'warn' | 'error'; msg: string }[];
   tilePolicy: string;

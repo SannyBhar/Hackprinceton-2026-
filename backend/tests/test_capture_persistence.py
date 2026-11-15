@@ -63,7 +63,7 @@ async def test_continuous_input_release_and_stale_stop(tmp_path):
         await s.joystick.sample(JoystickSample(seq=2,timestampMs=t+100,x=0,y=0))
         y=s.robot.y;await asyncio.sleep(.05)
         assert s.robot.y==pytest.approx(y)
-        s.joystick.last_received=t-1000
+        s.joystick.last_received=int(time.monotonic()*1000)-1000
         watch=asyncio.create_task(s.joystick.watchdog())
         await asyncio.sleep(.1);watch.cancel();await asyncio.gather(watch,return_exceptions=True)
         assert not s.joystick.active and s.recording['stopReason']=='stale joystick input'

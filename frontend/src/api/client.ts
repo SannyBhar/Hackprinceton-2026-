@@ -17,6 +17,7 @@ async function call<T>(method: string, path: string, body?: unknown): Promise<T>
 }
 
 export const api = {
+  hardwareCalibration: (body:{action:'wheel'|'translation'|'turn';wheel:number;duty:number;durationMs:number;confirmed:boolean}) => call<{status:string;error?:string}>('POST','/api/hardware/calibration',body),
   themes: () => call<ThemeJob[]>('GET','/api/themes'),
   generateTheme: (text:string) => call<ThemeJob>('POST','/api/themes',{text}),
   acceptTheme: (id:string) => call('POST',`/api/themes/${encodeURIComponent(id)}/accept`),

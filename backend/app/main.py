@@ -15,7 +15,7 @@ from fastapi import FastAPI, File, HTTPException, UploadFile, WebSocket, WebSock
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
-from pydantic import BaseModel, Field
+from pydantic import StrictBool, StrictInt, BaseModel, Field
 
 from .models import Instruction, ProjectionSettings, ProjectorCalibration, Puzzle
 from .robot.simulator import SimulatedRobot
@@ -221,8 +221,12 @@ async def camera_role(body: CameraRoleBody):
         raise HTTPException(409, "scan in progress")
     if session.camera is None:
         raise HTTPException(400, "camera mode is not configured")
-    await session.camera.switch(body.role)
-    return session.camera.status()
+    await guard(session.reserve_device, "camera transition")
+    try:
+        await session.camera.switch(body.role)
+        return session.camera.status()
+    finally:
+        session.release_device()
 
 
 class CameraCalibrationBody(BaseModel):
@@ -235,12 +239,48 @@ async def camera_calibration(body: CameraCalibrationBody | None = None):
         raise HTTPException(409, "stop motors before calibration")
     if session.camera is None:
         raise HTTPException(400, "camera mode is not configured")
+    await guard(session.reserve_device, "camera calibration")
     try:
         if session.camera._tracker is not None:
             session.camera._tracker.height_correction = body.heightCorrection if body else 0
         return await session.camera.calibrate()
     except ValueError as e:
         raise HTTPException(400, str(e))
+    finally:
+        session.release_device()
+
+
+class HardwareCalibrationBody(BaseModel):
+    action: Literal['wheel','translation','turn']
+    wheel: StrictInt = Field(default=0,ge=0,le=3)
+    duty: StrictInt = Field(ge=-200,le=200)
+    durationMs: StrictInt = Field(default=100,ge=1,le=250)
+    confirmed: StrictBool = False
+
+
+@app.post('/api/hardware/calibration')
+async def hardware_calibration(body: HardwareCalibrationBody):
+    from .hardware import load_profile
+    import uuid
+    if not body.confirmed or body.duty == 0:
+        raise HTTPException(400,'explicit one-shot confirmation and nonzero duty required')
+    try:
+        profile=load_profile()
+    except (OSError,ValueError) as e:
+        raise HTTPException(400,f'private hardware profile required: {e}')
+    if not profile.wiringVerified or not profile.motorRatingVerified:
+        raise HTTPException(409,'verify wiring, supply and motor specification before energizing outputs')
+    if body.action != 'wheel' and any(p is None for p in profile.polarity):
+        raise HTTPException(409,'measure and save each wheel polarity before movement trials')
+    if not hasattr(session.robot,'calibration'):
+        raise HTTPException(409,'calibration requires the physical robot adapter')
+    await guard(session.reserve_device,'hardware calibration pulse')
+    try:
+        ack = await guard(session.robot.calibration, {**body.model_dump(exclude={'confirmed'}),
+            'msgId':uuid.uuid4().hex,'polarity':profile.polarity})
+        return ack.__dict__
+    finally:
+        session.release_device()
 
 
 @app.get("/api/camera/image")

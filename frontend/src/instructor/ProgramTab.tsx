@@ -13,7 +13,7 @@ type Row = {
 const needsNumber = (op: Op | null) => op === 'FORWARD' || op === 'BACKWARD';
 
 export function ProgramTab({ snap, onRun }: { snap: Snapshot; onRun: () => void }) {
-  const { run, error, busy } = useAction();
+  const { run, error, busy, setError } = useAction();
   const [rows, setRows] = useState<Row[]>([]);
   const [check, setCheck] = useState<{ ok: boolean; errors: string[]; plannedEntries?: Cell[] } | null>(null);
 
@@ -35,10 +35,13 @@ export function ProgramTab({ snap, onRun }: { snap: Snapshot; onRun: () => void 
 
   useEffect(() => {
     if (!program.length || missingNumbers) { setCheck(null); return; }
+    let disposed = false;
+    setCheck(null);
     const t = setTimeout(() => {
-      api.validate(program).then(setCheck).catch(() => setCheck(null));
+      api.validate(program).then(result => {if(!disposed){setCheck(result);setError(null);}})
+        .catch(e => {if(!disposed){setCheck(null);setError(e.message);}});
     }, 150);
-    return () => clearTimeout(t);
+    return () => {disposed=true;clearTimeout(t);};
   }, [JSON.stringify(program), missingNumbers]);
 
   const setRow = (i: number, patch: Partial<Row>) => setRows((rs) => rs.map((r, j) => (j === i ? { ...r, ...patch } : r)));
@@ -87,7 +90,7 @@ export function ProgramTab({ snap, onRun }: { snap: Snapshot; onRun: () => void 
                       </td>
                       <td className="small">
                         {r.crop && <img src={r.crop} className="crop" />}
-                        {needsNumber(r.op) && (r.rawSteps != null ? `${r.rawSteps} · ${Math.round((r.confidence ?? 0) * 100)}%` : 'unreadable')}
+                        {needsNumber(r.op) && (r.rawSteps != null ? `${r.rawSteps} · ${r.confidence == null ? 'uncalibrated / uncertain' : `${Math.round(r.confidence * 100)}%`}` : 'unreadable')}
                         {r.issues.map((x, k) => <div key={k} className="issue">{x}</div>)}
                         {!r.reviewed && <button className="ghost" onClick={() => setRow(i, { reviewed: true })}>✓ Looks right</button>}
                       </td>

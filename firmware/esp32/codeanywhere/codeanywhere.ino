@@ -1,36 +1,19 @@
-// CodeAnywhere robot firmware (ESP32, Arduino framework) — UNVERIFIED SCAFFOLD.
-//
-// Libraries: "WebSockets" by Markus Sattler (arduinoWebSockets), "ArduinoJson" v7.
-// Protocol: see backend/app/robot/esp32_ws.py.
-//
-// Safety properties this sketch must keep:
-//  * Every motion has a bounded duration (open-loop timing until encoders/camera close the loop).
-//  * Explicit STOP preempts any motion immediately.
-//  * Heartbeat watchdog: no "hb" frame for HEARTBEAT_TIMEOUT_MS -> motors off.
-//  * A msgId seen before is acknowledged as DUPLICATE and never re-executed.
-//
-// !!! GPIO pins and motor parameters below are PLACEHOLDERS. Do not wire to these numbers until
-// !!! the team confirms the chassis motor voltage/stall current vs. DRV8833 limits (1.5A/ch RMS),
-// !!! power regulation, common ground, and pin assignment. See docs/HARDWARE_CHECKLIST.md.
-
+// Grassroot XIAO ESP32-S3 robot. Disabled by default; measured run profile required.
+// Legacy AP and source paths are retained for compatibility.
 #include <WiFi.h>
 #include <WebSocketsServer.h>
 #include <ArduinoJson.h>
 #include "hardware_pins.h"
-#ifndef GRASSROOT_WIRING_VERIFIED
-#define GRASSROOT_WIRING_VERIFIED 0
+#ifndef GRASSROOT_HARDWARE_MODE
+#define GRASSROOT_HARDWARE_MODE 0
 #endif
+#include "../network_config.h"
 
-// ---------- network (ESP32 runs its own access point; laptop joins it) ----------
-const char* AP_SSID = "codeanywhere-robot";
-const char* AP_PASS = "change-me-please";   // >= 8 chars
 WebSocketsServer ws(81);
 
-// Proposed XIAO pin constants: hardware_pins.h; wiring: docs/ESP32_MOTOR_WIRING.md.
-// Reference only for now: active pins stay disabled; no motor integration in this change.
-// ---------- motor driver pins: TODO confirm (two DRV8833 = 4 H-bridges) ----------
+// Confirmed raw GPIO pairs; SLP pins tied to 3V3.
 // Order: front-left, front-right, rear-left, rear-right. Each motor uses IN1/IN2 PWM.
-#if GRASSROOT_WIRING_VERIFIED
+#if GRASSROOT_HARDWARE_MODE != 0
 using namespace grassroot_hardware;
 const int MOTOR_IN1[4] = {LF_IN1, RF_IN1, LR_IN1, RR_IN1};
 const int MOTOR_IN2[4] = {LF_IN2, RF_IN2, LR_IN2, RR_IN2};
@@ -38,14 +21,17 @@ const int MOTOR_IN2[4] = {LF_IN2, RF_IN2, LR_IN2, RR_IN2};
 const int MOTOR_IN1[4] = {-1, -1, -1, -1};
 const int MOTOR_IN2[4] = {-1, -1, -1, -1};
 #endif
-// Sketch order LF, RF, LR, RR. Verify one wheel at a time before changing polarity.
-const int MOTOR_POLARITY[4] = {1, 1, 1, 1};
-const int PWM_FREQ = 20000, PWM_BITS = 8;
-
-// ---------- movement calibration (measure on the real board!) ----------
-float MS_PER_CELL = 1400;     // TODO calibrate: time to travel one cell at DRIVE_DUTY
-float MS_PER_90 = 650;        // TODO calibrate: time for an in-place 90° turn at TURN_DUTY
-int DRIVE_DUTY = 170, TURN_DUTY = 160;
+// Calibration pulses use raw polarity; normal control uses measured LF/RF/LR/RR values.
+#if GRASSROOT_HARDWARE_MODE == 2
+const int MOTOR_POLARITY[4] = {PROFILE_POLARITY_0, PROFILE_POLARITY_1, PROFILE_POLARITY_2, PROFILE_POLARITY_3};
+const uint32_t MS_PER_CELL = PROFILE_MS_CELL, MS_PER_90 = PROFILE_MS_90;
+const int DRIVE_DUTY = PROFILE_DRIVE_DUTY, TURN_DUTY = PROFILE_TURN_DUTY;
+#else
+const int MOTOR_POLARITY[4] = {1,1,1,1};
+const uint32_t MS_PER_CELL = 0, MS_PER_90 = 0;
+const int DRIVE_DUTY = 0, TURN_DUTY = 0;
+#define PROFILE_ID "unmeasured"
+#endif
 const uint32_t MAX_COMMAND_MS = 8000;       // hard bound for any single command
 const uint32_t HEARTBEAT_TIMEOUT_MS = 1000;
 
@@ -72,12 +58,13 @@ void motorsOff() { drive(0, 0); }
 void sendAck(uint8_t client, const String& msgId, const char* status, const char* err = nullptr) {
   JsonDocument d; d["type"] = "ack"; d["msgId"] = msgId; d["status"] = status;
   if (err) d["error"] = err;
+  d["remainingCommands"] = 128-recentCount;
   String out; serializeJson(d, out); ws.sendTXT(client, out);
 }
 
-void finishMotion(const char* status) {
+void finishMotion(const char* status, const char* reason = nullptr) {
   motorsOff();
-  if (motion.active) sendAck(motion.client, motion.msgId, status);
+  if (motion.active) sendAck(motion.client, motion.msgId, status, reason);
   motion.active = false;
 }
 
@@ -85,13 +72,13 @@ void handleCmd(uint8_t client, JsonDocument& d) {
   String msgId = d["msgId"] | "";
   String kind = d["kind"] | "";
   int value = d["value"] | 0;
-  if (kind == "STOP") { finishMotion("STOPPED"); sendAck(client, msgId, "DONE"); return; }
+  if (kind == "STOP") { finishMotion("STOPPED","explicit host stop"); sendAck(client, msgId, "DONE"); return; }
   if (!d["value"].is<int>()) { finishMotion("STOPPED"); sendAck(client,msgId,"ERROR","value must be an integer"); return; }
   if (msgId.length() == 0 || msgId.length() > 64) {
     finishMotion("STOPPED"); sendAck(client, msgId, "ERROR", "invalid msgId"); return;
   }
-  if (!GRASSROOT_WIRING_VERIFIED) {
-    sendAck(client, msgId, "ERROR", "wiring not verified; outputs disabled"); return;
+  if (GRASSROOT_HARDWARE_MODE != 2) {
+    sendAck(client, msgId, "ERROR", "calibrated run profile required"); return;
   }
   if (seen(msgId)) { sendAck(client, msgId, "DUPLICATE"); return; }
   if (motion.active) { sendAck(client, msgId, "ERROR", "busy"); return; }
@@ -125,16 +112,41 @@ void handleDrive(uint8_t client, JsonDocument& d) {
   int ttl = d["ttlMs"] | 0;
   float linear = d["linear"] | 0.0f, angular = d["angular"] | 0.0f;
   int64_t seq = d["seq"] | (int64_t)-1;
-  if (!GRASSROOT_WIRING_VERIFIED || d["protocolVersion"] != 2 || ttl < 1 || ttl > 250 ||
+  if (GRASSROOT_HARDWARE_MODE != 2 || d["protocolVersion"] != 2 || ttl < 1 || ttl > 250 ||
       !isfinite(linear) || !isfinite(angular) || abs(linear)>1 || abs(angular)>1 ||
       (linear != 0 && angular != 0) || motion.active || (continuousActive && driveClient != client)) {
     continuousActive=false; motorsOff(); sendAck(client,id,"ERROR","invalid drive or unavailable control"); return;
   }
   if (seq <= driveSeq) { sendAck(client,id,"DUPLICATE"); return; }
   driveSeq=seq; driveClient=client;
-  int left=(int)((linear+angular)*DRIVE_DUTY), right=(int)((linear-angular)*DRIVE_DUTY);
+  int left=(int)(linear*DRIVE_DUTY+angular*TURN_DUTY), right=(int)(linear*DRIVE_DUTY-angular*TURN_DUTY);
   drive(left,right); continuousActive=true; driveExpires=millis()+ttl;
   sendAck(client,id,"DONE");
+}
+
+// Instructor-only bounded one-shot pulse/trial; never a student command.
+void handleCalibration(uint8_t client, JsonDocument& d) {
+  String id=d["msgId"] | "", action=d["action"] | "";
+  int duration=d["durationMs"] | 100, duty=d["duty"] | 0;
+  if (GRASSROOT_HARDWARE_MODE!=1 || motion.active || continuousActive || id.length()==0 || id.length()>64 ||
+      !d["durationMs"].is<int>() || !d["duty"].is<int>() || duration<1 || duration>250 || duty==0 || abs(duty)>200) {
+    sendAck(client,id,"ERROR","invalid calibration pulse or calibration profile required"); return;
+  }
+  if (seen(id)) { sendAck(client,id,"DUPLICATE"); return; }
+  if (action=="wheel") {
+    int wheel=d["wheel"] | -1;
+    if (!d["wheel"].is<int>() || wheel<0 || wheel>3) { sendAck(client,id,"ERROR","invalid wheel"); return; }
+    if (!remember(id)) { sendAck(client,id,"ERROR","ledger full"); return; }
+    motorsOff(); setMotor(wheel,duty);
+  } else if (action=="translation" || action=="turn") {
+    for (int i=0;i<4;i++) {
+      if (!d["polarity"][i].is<int>() || abs(d["polarity"][i].as<int>())!=1) { sendAck(client,id,"ERROR","measure all wheel polarities first"); return; }
+    }
+    if (!remember(id)) { sendAck(client,id,"ERROR","ledger full"); return; }
+    for (int i=0;i<4;i++) setMotor(i,duty*d["polarity"][i].as<int>()*(action=="turn" && (i==1 || i==3) ? -1 : 1));
+  } else { sendAck(client,id,"ERROR","invalid calibration action"); return; }
+  motion={true,millis()+(uint32_t)duration,id,client};
+  sendAck(client,id,"ACCEPTED");
 }
 
 void onWs(uint8_t client, WStype_t type, uint8_t* payload, size_t len) {
@@ -143,7 +155,13 @@ void onWs(uint8_t client, WStype_t type, uint8_t* payload, size_t len) {
     controlClient = client;
     // Starting a new control connection never resumes movement.
     finishMotion("STOPPED"); continuousActive=false; driveSeq=-1;
-    ws.sendTXT(client,"{\"type\":\"hello\",\"protocolVersion\":2}"); return;
+    JsonDocument hello;
+    hello["type"]="hello"; hello["protocolVersion"]=2;
+    hello["outputsEnabled"]=GRASSROOT_HARDWARE_MODE!=0;
+    hello["calibrated"]=GRASSROOT_HARDWARE_MODE==2;
+    hello["mode"]=GRASSROOT_HARDWARE_MODE==2 ? "run" : GRASSROOT_HARDWARE_MODE==1 ? "calibration" : "disabled";
+    hello["profileId"]=PROFILE_ID; hello["remainingCommands"]=128-recentCount;
+    String out; serializeJson(hello,out); ws.sendTXT(client,out); return;
   }
   if (type == WStype_DISCONNECTED) { if (client==controlClient) { finishMotion("STOPPED"); continuousActive=false; controlClient=-1; } return; }
   if (type != WStype_TEXT) return;
@@ -153,6 +171,7 @@ void onWs(uint8_t client, WStype_t type, uint8_t* payload, size_t len) {
   String t = d["type"] | "";
   if (client != controlClient) return;
   if (t == "hb") lastHeartbeat = millis();
+  else if (t == "calibration") { lastHeartbeat=millis(); handleCalibration(client,d); }
   else if (t == "drive") { lastHeartbeat = millis(); handleDrive(client,d); }
   else if (t == "cmd") {
     if (String(d["kind"] | "") == "STOP") continuousActive=false;
@@ -168,19 +187,24 @@ void setup() {
     if (MOTOR_IN1[i] >= 0) { pinMode(MOTOR_IN1[i], OUTPUT); pinMode(MOTOR_IN2[i], OUTPUT); }
   }
   motorsOff();
-  WiFi.softAP(AP_SSID, AP_PASS);
-  Serial.printf("AP %s at %s, ws port 81\n", AP_SSID, WiFi.softAPIP().toString().c_str());
+  grassrootNetworkStart(true);
+  Serial.println("Robot WebSocket port 81; waiting for network address");
   ws.begin();
   ws.onEvent(onWs);
 }
 
 void loop() {
   ws.loop();
+  static String printedAddress;
+  String address=grassrootNetworkAddress().toString();
+  if (address!="0.0.0.0" && address!=printedAddress) {
+    Serial.printf("Robot address %s, WebSocket port 81\n",address.c_str()); printedAddress=address;
+  }
   uint32_t now = millis();
   if (continuousActive && ((int32_t)(now-driveExpires)>=0 || now-lastHeartbeat>HEARTBEAT_TIMEOUT_MS)) { motorsOff(); continuousActive=false; }
   if (motion.active && (int32_t)(now - motion.endAt) >= 0) finishMotion("DONE");
   if (motion.active && now - lastHeartbeat > HEARTBEAT_TIMEOUT_MS) {
     Serial.println("heartbeat lost -> STOP");
-    finishMotion("STOPPED");
+    finishMotion("STOPPED","heartbeat watchdog expired");
   }
 }

@@ -10,10 +10,11 @@ export function IntelligenceTab({snap}:{snap:Snapshot}) {
   const [report,setReport]=useState<ProgressReport|null>(null);
   const [suggestions,setSuggestions]=useState<Recommendation[]>([]);
   const {run,error}=useAction();
+  const [pollError,setPollError]=useState<string|null>(null);
   const moving=['RUNNING','RECORDING'].includes(snap.state);
   useEffect(()=>{
     let disposed=false;
-    const refresh=()=>api.themes().then(j=>{if(!disposed)setJobs(j);}).catch(()=>{});
+    const refresh=()=>api.themes().then(j=>{if(!disposed){setJobs(j);setPollError(null);}}).catch(e=>{if(!disposed)setPollError(e.message);});
     refresh();const timer=window.setInterval(refresh,2000);
     return ()=>{disposed=true;window.clearInterval(timer);};
   },[]);
@@ -21,7 +22,7 @@ export function IntelligenceTab({snap}:{snap:Snapshot}) {
   useEffect(()=>{setReport(null);setSuggestions([]);run(progress);},[snap.studentId]);
   return <>
     <Card title="Decorative AI themes" subtitle="Nano Banana artwork changes appearance only. Preview and accept while stopped. Static themes remain available offline.">
-      <input aria-label="Theme description" value={text} maxLength={500} onChange={e=>setText(e.target.value)} />
+      <ErrorBox error={pollError}/><input aria-label="Theme description" value={text} maxLength={500} onChange={e=>setText(e.target.value)} />
       <button disabled={!text.trim()} onClick={()=>run(async()=>{await api.generateTheme(text);setJobs(await api.themes());})}>Generate artwork</button>
       <button disabled={moving} onClick={()=>run(()=>api.setProjection({...snap.projection,artworkId:null,artworkHash:null}))}>Use static theme</button>
       {jobs.slice().reverse().map(j=><div key={j.id}><p>{j.themeText} · {j.status}{j.accepted?' · accepted':''}</p>
