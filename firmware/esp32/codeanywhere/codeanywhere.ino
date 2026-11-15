@@ -1,6 +1,7 @@
 // Grassroot XIAO ESP32-S3 robot. Disabled by default; measured run profile required.
 // Legacy AP and source paths are retained for compatibility.
 #include <WiFi.h>
+#include <ArduinoOTA.h>
 #include <WebSocketsServer.h>
 #include <ArduinoJson.h>
 #include "hardware_pins.h"
@@ -45,14 +46,56 @@ int controlClient = -1;
 bool seen(const String& id) { for (auto& s : recentIds) if (s == id) return true; return false; }
 bool remember(const String& id) { if (recentCount >= 128) return false; recentIds[recentCount++] = id; return true; }
 
+#ifndef REAR_MOTORS_ENABLED
+#define REAR_MOTORS_ENABLED 1
+#endif
 void setMotor(int i, int duty) {   // duty -255..255
   if (MOTOR_IN1[i] < 0) return;    // pins not configured: refuse to drive
+#if !REAR_MOTORS_ENABLED
+  if (i == 2 || i == 3) duty = 0;    // rear motors disabled: front-wheel drive only
+#endif
   duty = constrain(duty * MOTOR_POLARITY[i], -200, 200);
   int a = duty > 0 ? duty : 0, b = duty < 0 ? -duty : 0;
   analogWrite(MOTOR_IN1[i], a);
   analogWrite(MOTOR_IN2[i], b);
 }
-void drive(int left, int right) { setMotor(0, left); setMotor(2, left); setMotor(1, right); setMotor(3, right); }
+// Measured on the real chassis: wheels 0 and 2 are on the physical RIGHT, 1 and 3 on the LEFT.
+void drive(int left, int right) { setMotor(1, left); setMotor(3, left); setMotor(0, right); setMotor(2, right); }
+// The physical left side runs stronger and pulled the robot right on straight moves; scale it down.
+#ifndef PROFILE_LEFT_TRIM_PCT
+#define PROFILE_LEFT_TRIM_PCT 100
+#endif
+int trimLeft(int duty) { return duty * PROFILE_LEFT_TRIM_PCT / 100; }
+// The physical left side gets going first and swings the nose right; start the right side,
+// then the left a few ms later, on straight moves only.
+#ifndef LEFT_START_DELAY_MS
+#define LEFT_START_DELAY_MS 25
+#endif
+// Turns: the stronger left side pushed the robot forward while rotating; weaken it so the turn stays in place.
+#ifndef TURN_LEFT_TRIM_PCT
+#define TURN_LEFT_TRIM_PCT 70
+#endif
+// Continuous turn length as a percentage of msPer90, tuned on the floor per direction.
+#ifndef TURN_RIGHT_TIME_PCT
+#define TURN_RIGHT_TIME_PCT 46.5
+#endif
+#ifndef TURN_LEFT_TIME_PCT
+#define TURN_LEFT_TIME_PCT 55.6
+#endif
+// Turns: front wheels pivot (1 = front-left, 0 = front-right); rear wheels only creep forward.
+// Rear wheels nudge forward during a turn at a low share of the turn duty.
+#ifndef TURN_REAR_FORWARD_PCT
+#define TURN_REAR_FORWARD_PCT 0
+#endif
+void turnFrontOnly(int left, int right) {
+  int rear = TURN_DUTY * TURN_REAR_FORWARD_PCT / 100;
+  setMotor(1, left); setMotor(0, right); setMotor(2, rear); setMotor(3, rear);
+}
+void driveStraight(int left, int right) {
+  setMotor(0, right); setMotor(2, right);
+  delay(LEFT_START_DELAY_MS);
+  setMotor(1, left); setMotor(3, left);
+}
 void motorsOff() { drive(0, 0); }
 
 void sendAck(uint8_t client, const String& msgId, const char* status, const char* err = nullptr) {
@@ -93,10 +136,10 @@ void handleCmd(uint8_t client, JsonDocument& d) {
   uint32_t dur;
   if (kind == "MOVE") {
     dur = (uint32_t)(abs(value) * MS_PER_CELL);
-    int s = value > 0 ? DRIVE_DUTY : -DRIVE_DUTY; drive(s, s);
+    int s = value > 0 ? DRIVE_DUTY : -DRIVE_DUTY; driveStraight(trimLeft(s), s);
   } else if (kind == "TURN") {
-    dur = (uint32_t)(abs(value) / 90.0 * MS_PER_90);
-    int s = value > 0 ? TURN_DUTY : -TURN_DUTY; drive(s, -s);   // +value = right/clockwise
+    dur = (uint32_t)(abs(value) / 90.0 * MS_PER_90 * (value > 0 ? TURN_RIGHT_TIME_PCT : TURN_LEFT_TIME_PCT) / 100.0);
+    int s = value > 0 ? TURN_DUTY : -TURN_DUTY; turnFrontOnly(s * TURN_LEFT_TRIM_PCT / 100, -s);   // +value = right/clockwise
   } else { sendAck(client, msgId, "ERROR", "unknown kind"); return; }
   if (dur > MAX_COMMAND_MS) dur = MAX_COMMAND_MS;
   motion = {true, millis() + dur, msgId, client};
@@ -143,7 +186,12 @@ void handleCalibration(uint8_t client, JsonDocument& d) {
       if (!d["polarity"][i].is<int>() || abs(d["polarity"][i].as<int>())!=1) { sendAck(client,id,"ERROR","measure all wheel polarities first"); return; }
     }
     if (!remember(id)) { sendAck(client,id,"ERROR","ledger full"); return; }
-    for (int i=0;i<4;i++) setMotor(i,duty*d["polarity"][i].as<int>()*(action=="turn" && (i==1 || i==3) ? -1 : 1));
+    if (action=="translation") {   // same staggered start as run-mode straight moves
+      setMotor(0,duty*d["polarity"][0].as<int>()); setMotor(2,duty*d["polarity"][2].as<int>());
+      delay(LEFT_START_DELAY_MS);
+      setMotor(1,duty*d["polarity"][1].as<int>()); setMotor(3,duty*d["polarity"][3].as<int>());
+    } else
+      for (int i=0;i<4;i++) { int v=duty*d["polarity"][i].as<int>()*((i==0 || i==2) ? -1 : 1); setMotor(i,(i==2 || i==3) ? 0 : (i==1) ? v*TURN_LEFT_TRIM_PCT/100 : v); }
   } else { sendAck(client,id,"ERROR","invalid calibration action"); return; }
   motion={true,millis()+(uint32_t)duration,id,client};
   sendAck(client,id,"ACCEPTED");
@@ -200,7 +248,38 @@ void loop() {
   if (address!="0.0.0.0" && address!=printedAddress) {
     Serial.printf("Robot address %s, WebSocket port 81\n",address.c_str()); printedAddress=address;
   }
+#ifdef GRASSROOT_OTA_PASSWORD
+  // Wireless firmware updates (password-protected). Stops the motors before any flash write.
+  static bool otaStarted=false;
+  if (address!="0.0.0.0" && !otaStarted) {
+    ArduinoOTA.setHostname("grassroot-robot");   // also reachable as grassroot-robot.local
+    ArduinoOTA.setPassword(GRASSROOT_OTA_PASSWORD);
+    ArduinoOTA.onStart([]() { continuousActive=false; finishMotion("STOPPED","firmware update"); });
+    ArduinoOTA.begin(); otaStarted=true;
+    Serial.println("Wireless update ready as grassroot-robot.local");
+  }
+  if (otaStarted) ArduinoOTA.handle();
+#endif
   uint32_t now = millis();
+  static uint32_t lastWifiLog=0;
+  if (address=="0.0.0.0" && now-lastWifiLog>3000) {  // connection diagnostics only; never prints credentials
+    lastWifiLog=now;
+    Serial.printf("Wi-Fi not connected yet, status %d (1=network not found, 4=join/password failed, 6=disconnected)\n",(int)WiFi.status());
+  }
+#if GRASSROOT_WIFI_STATION
+  static uint32_t lastScan=0;
+  if (address=="0.0.0.0" && now-lastScan>15000) {  // antenna/range diagnostic: what can this radio hear?
+    lastScan=now;
+    int n=WiFi.scanNetworks(false,false,false,300);  // blocking, ~3 s; the robot is idle while unconnected
+    bool seen=false;
+    for (int i=0;i<n;i++) if (WiFi.SSID(i)==GRASSROOT_WIFI_SSID) {
+      seen=true;
+      Serial.printf("Wi-Fi scan: target network seen on channel %d at %d dBm (-30 great, -70 fair, -85 poor)\n",(int)WiFi.channel(i),(int)WiFi.RSSI(i));
+    }
+    if (!seen) Serial.printf("Wi-Fi scan: %d networks visible, target network NOT among them\n",n);
+    WiFi.scanDelete();
+  }
+#endif
   if (continuousActive && ((int32_t)(now-driveExpires)>=0 || now-lastHeartbeat>HEARTBEAT_TIMEOUT_MS)) { motorsOff(); continuousActive=false; }
   if (motion.active && (int32_t)(now - motion.endAt) >= 0) finishMotion("DONE");
   if (motion.active && now - lastHeartbeat > HEARTBEAT_TIMEOUT_MS) {

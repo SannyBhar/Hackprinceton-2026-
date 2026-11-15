@@ -380,6 +380,30 @@ async def hardware_calibration(body: HardwareCalibrationBody):
         session.release_device()
 
 
+class TestMoveBody(BaseModel):
+    action: Literal['FORWARD', 'BACKWARD', 'LEFT', 'RIGHT']
+    confirmed: StrictBool = False
+
+
+@app.post('/api/hardware/test-move')
+async def hardware_test_move(body: TestMoveBody):
+    """One continuous calibrated primitive for floor testing (run firmware only). No pose needed."""
+    import uuid
+    from .robot.base import Primitive
+    if not body.confirmed:
+        raise HTTPException(400, 'explicit one-shot confirmation required')
+    if not hasattr(session.robot, 'calibration'):
+        raise HTTPException(409, 'test moves require the physical robot adapter')
+    kind, value = {'FORWARD': ('MOVE', 1), 'BACKWARD': ('MOVE', -1),
+                   'LEFT': ('TURN', -90), 'RIGHT': ('TURN', 90)}[body.action]
+    await guard(session.reserve_device, 'hardware test move')
+    try:
+        ack = await guard(session.robot.execute, Primitive('test', 0, uuid.uuid4().hex, kind, value))
+        return ack.__dict__
+    finally:
+        session.release_device()
+
+
 @app.get("/api/camera/image")
 def camera_image():
     from fastapi.responses import Response

@@ -5,15 +5,22 @@ Wire protocol (JSON text frames), matching firmware/esp32/codeanywhere/codeanywh
   laptop -> robot  {"type":"hb","t":<ms>}                     every 250 ms
   robot  -> laptop {"type":"ack","msgId","status":"ACCEPTED|DONE|STOPPED|DUPLICATE|ERROR","error"?}
 Firmware stops motors if no heartbeat for 1000 ms and bounds every command's duration.
-Pose does NOT come from the robot; it comes from the overhead camera tracker.
+
+Pose is ESTIMATED from the commands themselves (dead reckoning): the robot has no sensors, so
+a MOVE advances the estimate across cells at the measured msPerCell from the private hardware
+profile, and a TURN changes heading when the robot acknowledges it. This is what lights tiles
+during a run when the overhead camera is not used. It reflects what the robot was told to do,
+not where it physically ended up.
 """
 from __future__ import annotations
 
 import asyncio
 import json
+import math
 import time
 from typing import Optional
 
+from ..models import RobotPose
 from .base import Ack, PoseCallback, Primitive
 
 
@@ -23,7 +30,10 @@ class Esp32WebSocketRobot:
     def __init__(self, url: str, ack_timeout_s: float = 15.0):
         self.url = url
         self.ack_timeout_s = ack_timeout_s
-        self.on_pose: Optional[PoseCallback] = None  # camera supplies pose
+        self.on_pose: Optional[PoseCallback] = None
+        # Dead-reckoned pose (board units: x = col + 0.5, y = row + 0.5, 0 deg = north = -y).
+        self.x, self.y, self.heading = 0.5, 0.5, 0.0
+        self._motion: Optional[dict] = None   # active MOVE: start time, duration, from/to
         self.continuous_supported = False
         self._drive_seq = 0
         self.on_status = None
@@ -39,6 +49,35 @@ class Esp32WebSocketRobot:
 
     async def start(self) -> None:
         self._tasks.append(asyncio.create_task(self._connect_loop()))
+        self._tasks.append(asyncio.create_task(self._pose_loop()))
+
+    # ------------------------------------------------------------------ dead reckoning
+    def _ms_per_cell(self) -> Optional[int]:
+        try:
+            from ..hardware import load_profile
+            return load_profile().msPerCell
+        except Exception:
+            return None
+
+    def _current_xy(self, at_ms: Optional[int] = None):
+        m = self._motion
+        if not m:
+            return self.x, self.y
+        t = (time.time() * 1000 if at_ms is None else at_ms) - m["start"]
+        f = 0.0 if m["dur"] <= 0 else max(0.0, min(1.0, t / m["dur"]))
+        return m["x0"] + (m["x1"] - m["x0"]) * f, m["y0"] + (m["y1"] - m["y0"]) * f
+
+    def _emit(self):
+        if self.on_pose is None:
+            return
+        x, y = self._current_xy()
+        self.on_pose(RobotPose(timestampMs=int(time.time() * 1000), x=x, y=y,
+                               headingDeg=self.heading % 360, trackingValid=True))
+
+    async def _pose_loop(self):
+        while True:  # steady stream keeps tile timing live and the session's stale watchdog fed
+            self._emit()
+            await asyncio.sleep(0.05)
 
     async def close(self) -> None:
         for task in self._tasks:
@@ -125,7 +164,25 @@ class Esp32WebSocketRobot:
         if p.kind != 'STOP':
             try: self.preflight()
             except Exception as e: return Ack(p.msgId,'ERROR',str(e))
-        return await self._exchange({'type':'cmd',**p.to_dict()},self.ack_timeout_s)
+        if p.kind == 'MOVE':
+            rad = math.radians(self.heading)
+            ms = self._ms_per_cell()
+            self._motion = dict(start=time.time() * 1000, dur=(ms or 0) * abs(p.value),
+                                x0=self.x, y0=self.y,
+                                x1=self.x + round(math.sin(rad)) * p.value,
+                                y1=self.y - round(math.cos(rad)) * p.value)
+        ack = await self._exchange({'type':'cmd',**p.to_dict()},self.ack_timeout_s)
+        if p.kind == 'MOVE' and self._motion:
+            m = self._motion
+            if ack.status == 'DONE':
+                self.x, self.y = m["x1"], m["y1"]          # commanded move completed
+            else:
+                self.x, self.y = self._current_xy()        # stopped early: best time-based guess
+            self._motion = None
+        elif p.kind == 'TURN' and ack.status == 'DONE':
+            self.heading = (self.heading + p.value) % 360
+        self._emit()
+        return ack
 
     async def _exchange(self, message, timeout):
         msg_id=message['msgId']
@@ -184,4 +241,7 @@ class Esp32WebSocketRobot:
                 if self.on_status:self.on_status()
 
     def place(self, row: int, col: int, heading_deg: float) -> None:
-        pass  # physical robot is placed by hand
+        # The instructor puts the robot here by hand; the estimate restarts from this cell.
+        self._motion = None
+        self.x, self.y, self.heading = col + 0.5, row + 0.5, heading_deg % 360
+        self._emit()
