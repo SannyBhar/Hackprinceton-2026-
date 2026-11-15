@@ -101,7 +101,7 @@ export function ProjectionView() {
   }, [snap, ps, corners, active, save]);
 
   if (!snap || !cal || !ps) {
-    return <div className="proj-root"><div className="proj-msg">Connecting to CodeAnywhere…</div></div>;
+    return <div className="proj-root"><div className="proj-msg">Connecting to Grassroot…</div></div>;
   }
 
   const W = snap.puzzle.cols * CELL;

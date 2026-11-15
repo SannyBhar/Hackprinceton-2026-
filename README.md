@@ -1,11 +1,14 @@
-# CodeAnywhere
+# Grassroot
 
 Physical-card coding robot for grades 2–4. Students lay out ArUco coding cards; the instructor
 webapp scans them, runs the robot on a physical grid, tracks it with an overhead camera, grades
 each cell entry against an ordered target route, and projects live feedback onto the board via a
 plain projector.
 
-Scope: [CodeAnywhere_MVP_Scope.md](CodeAnywhere_MVP_Scope.md) · Plan: [docs/BUILD_PLAN.md](docs/BUILD_PLAN.md) ·
+Architecture specification: [Grassroot](docs/Grassroot_Project_Architecture.md) ·
+Structural refactor: [brief](docs/Grassroot_Codex_Structural_Refactor.md) ·
+Current architecture: [module map](docs/ARCHITECTURE.md) · [refactor notes and checks](docs/REFACTOR_NOTES.md) ·
+Legacy scope: [CodeAnywhere_MVP_Scope.md](CodeAnywhere_MVP_Scope.md) · Plan: [docs/BUILD_PLAN.md](docs/BUILD_PLAN.md) ·
 Defaults we chose: [docs/ASSUMPTIONS.md](docs/ASSUMPTIONS.md) · Projector setup: [docs/PROJECTION_SETUP.md](docs/PROJECTION_SETUP.md) ·
 Hardware: [docs/HARDWARE_CHECKLIST.md](docs/HARDWARE_CHECKLIST.md)
 
@@ -86,3 +89,21 @@ docs/             build plan, assumptions, projection setup, hardware checklist
 
 **Status labels:** everything under "Tests" runs against the simulator. The ESP32 transport,
 firmware, OpenCV card reader and camera tracker are written but **not verified on hardware**.
+
+## Configuration and refactor status
+
+Backend settings are assembled in `app/settings.py` and adapters in `app/dependencies.py`.
+Every `CA_*` variable above (plus `CA_DATA_DIR`) remains supported. Equivalent
+`GRASSROOT_*` variables take precedence; see `backend/settings.env.example`.
+Existing camera indices (scan 0, tracker 1) are retained for compatibility. The injected
+camera interface does **not** implement single-camera scheduling or handoff.
+
+The current implementation uses JSON storage, discrete keyboard/gamepad recording,
+manual numeric review and static themes. OCR models, continuous joystick reconstruction,
+SQLite and AI providers are **not implemented** by this refactor. The supplied full product
+specification includes future work; it is not a claim of current functionality.
+
+Additional verification: `npm --prefix frontend run typecheck` and
+`npm --prefix frontend run build`. No lint script or backend static type checker is configured.
+The baseline npm install reported **8 vulnerabilities (2 moderate, 4 high, 2 critical)**.
+Dependency upgrades are deferred; package manifests and lockfiles were not changed.

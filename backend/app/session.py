@@ -13,7 +13,7 @@ from .models import (HEADING_DEG, Cell, Corner, Instruction, ProjectionSettings,
                      StopReason)
 from .recording import RecordedAction, generate_program
 from .robot.base import Primitive, RobotAdapter
-from .storage import Storage
+from .repository import Repository
 from .tracking import CellEntryDetector, TrackerConfig
 from .vision.cards import CardRecognizer
 
@@ -39,7 +39,7 @@ def default_calibration() -> ProjectorCalibration:
 
 
 class Session:
-    def __init__(self, robot: RobotAdapter, recognizer: CardRecognizer, storage: Storage,
+    def __init__(self, robot: RobotAdapter, recognizer: CardRecognizer, storage: Repository,
                  tracker_cfg: TrackerConfig | None = None, tile_policy: str = "first_latest",
                  max_steps: int = DEFAULT_MAX_STEPS):
         self.robot = robot
@@ -68,6 +68,7 @@ class Session:
         self._rec_current: Optional[RecordedAction] = None
         self._rec_lock = asyncio.Lock()
         self._last_toggle = 0
+        self._bg: list[asyncio.Task] = []
         self._run_task: Optional[asyncio.Task] = None
         self._stop_reason: Optional[StopReason] = None
 
@@ -83,8 +84,10 @@ class Session:
         self._bg = [asyncio.create_task(self._watchdog())]
 
     async def close(self):
-        for t in self._bg + ([self._run_task] if self._run_task else []):
+        tasks = self._bg + ([self._run_task] if self._run_task else [])
+        for t in tasks:
             t.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
         if hasattr(self.robot, "close"):
             await self.robot.close()
 

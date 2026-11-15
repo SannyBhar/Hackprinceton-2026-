@@ -17,17 +17,19 @@ import time
 from typing import Optional
 
 from ..models import RobotPose
+from .camera import CameraSource, OpenCvCameraSource
 
 OUTER_CORNER_INDEX = {0: 0, 1: 1, 2: 2, 3: 3}  # aruco corner order TL,TR,BR,BL matches board
 
 
 class CameraTracker:
     def __init__(self, rows: int, cols: int, camera_index: int = 1, fps: float = 20.0,
-                 height_correction: float = 0.0):
+                 height_correction: float = 0.0, camera: CameraSource | None = None):
         import cv2
         self.cv2 = cv2
         self.rows, self.cols = rows, cols
         self.camera_index = camera_index
+        self.camera = camera or OpenCvCameraSource()
         self.period = 1.0 / fps
         self.height_correction = height_correction
         self.H = None
@@ -75,12 +77,9 @@ class CameraTracker:
                          headingDeg=heading, trackingValid=True)
 
     async def run(self):
-        cap = self.cv2.VideoCapture(self.camera_index)
-        try:
+        with self.camera.open(self.camera_index, "track") as cap:
             while True:
                 ok, frame = await asyncio.to_thread(cap.read)
                 if ok and self.on_pose:
                     self.on_pose(self.process(frame))
                 await asyncio.sleep(self.period)
-        finally:
-            cap.release()

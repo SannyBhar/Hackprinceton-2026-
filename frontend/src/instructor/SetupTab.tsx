@@ -5,7 +5,7 @@ import { Board } from '../board/Board';
 import { CalibrationPad, keystone } from '../calibration/CalibrationPad';
 import { THEMES } from '../board/themes';
 import { BoardCard, Card, ErrorBox, Feed, TwoCol, useAction } from './common';
-import { openProjectionWindow } from './InstructorApp';
+import { openProjectionWindow } from '../projection/window';
 
 const LABELS = ['TL', 'TR', 'BR', 'BL'];
 

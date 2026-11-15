@@ -8,7 +8,6 @@ Env vars:
 from __future__ import annotations
 
 import asyncio
-import os
 from contextlib import asynccontextmanager
 from typing import Literal, Optional
 
@@ -21,23 +20,9 @@ from pydantic import BaseModel
 from .models import Instruction, ProjectionSettings, ProjectorCalibration, Puzzle
 from .robot.simulator import SimulatedRobot
 from .session import ConflictError, InvalidError, Session
-from .storage import FIXTURES, ROOT, Storage
-from .vision.cards import FixtureCardRecognizer
-
-
-def build_session() -> Session:
-    storage = Storage()
-    if os.environ.get("CA_ROBOT", "sim") == "esp32":
-        from .robot.esp32_ws import Esp32WebSocketRobot
-        robot = Esp32WebSocketRobot(os.environ.get("CA_ROBOT_URL", "ws://192.168.4.1:81/"))
-    else:
-        robot = SimulatedRobot()
-    if os.environ.get("CA_CARDS", "fixture") == "opencv":
-        from .vision.cards import OpenCvCardRecognizer
-        recognizer = OpenCvCardRecognizer(int(os.environ.get("CA_CARD_CAMERA", "0")))
-    else:
-        recognizer = FixtureCardRecognizer(FIXTURES / "scans")
-    return Session(robot, recognizer, storage)
+from .settings import ROOT
+from .dependencies import build_session
+from .runtime import running_session
 
 
 session: Session
@@ -47,17 +32,11 @@ session: Session
 async def lifespan(app: FastAPI):
     global session
     session = build_session()
-    await session.start()
-    if os.environ.get("CA_TRACKER") == "camera":
-        from .vision.camera_tracker import CameraTracker
-        tracker = CameraTracker(session.puzzle.rows, session.puzzle.cols,
-                                int(os.environ.get("CA_TRACK_CAMERA", "1")))
-        tracker.on_pose = session.on_pose
-        asyncio.create_task(tracker.run())
-    yield
+    async with running_session(session):
+        yield
 
 
-app = FastAPI(title="CodeAnywhere", lifespan=lifespan)
+app = FastAPI(title="Grassroot", lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
 

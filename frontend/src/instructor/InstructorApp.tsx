@@ -1,3 +1,5 @@
+import { openProjectionWindow } from '../projection/window';
+export { openProjectionWindow } from '../projection/window';
 import { useState } from 'react';
 import { api } from '../api/client';
 import { useSession } from '../api/useSession';
@@ -17,16 +19,12 @@ const TABS = [
 ] as const;
 type Tab = (typeof TABS)[number][0];
 
-export function openProjectionWindow() {
-  window.open('/projection', 'codeanywhere-projection', 'popup,width=1280,height=800');
-}
-
 export function InstructorApp() {
   const { snap, connected } = useSession();
   const [tab, setTab] = useState<Tab>('puzzle');
 
   if (!snap) {
-    return <div className="loading">Connecting to the CodeAnywhere backend… (is it running on :8000?)</div>;
+    return <div className="loading">Connecting to the Grassroot backend… (is it running on :8000?)</div>;
   }
   const moving = snap.state === 'RUNNING' || snap.state === 'RECORDING';
 
@@ -36,7 +34,7 @@ export function InstructorApp() {
         <div className="brand">
           <div className="brand-mark"><RoverIcon size={30} /></div>
           <div>
-            <h1>CodeAnywhere</h1>
+            <h1>Grassroot</h1>
             <small>{snap.puzzle.name}</small>
           </div>
         </div>
