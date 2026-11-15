@@ -7,7 +7,7 @@ from .storage import Storage
 from .models import Puzzle, ProjectorCalibration
 from .settings import FIXTURES
 
-KINDS = {'students', 'recordings', 'calibrations', 'theme_assets', 'skill_estimates', 'settings'}
+from .repository import RECORD_KINDS as KINDS
 
 
 class SQLiteStorage(Storage):

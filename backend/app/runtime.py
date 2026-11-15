@@ -12,6 +12,12 @@ async def running_session(session: Session):
     try:
         await session.start()
         cfg = Settings.from_env()
+        from .ai.themes import ThemeJobs
+        session.themes = ThemeJobs(session,cfg.data_dir)
+        for job in await session.themes.list():
+            if job.get("status") == "GENERATING":
+                job.update(status="FAILED",error="application restarted; regenerate")
+                await session.themes.save(job)
         session._bg.append(asyncio.create_task(session.joystick.watchdog()))
         if cfg.joystick_port:
             session._bg.append(asyncio.create_task(session.joystick.serial_loop(cfg.joystick_port)))
@@ -27,6 +33,9 @@ async def running_session(session: Session):
                 tracker_task = asyncio.create_task(tracker.run())
         yield
     finally:
+        await session.robot.stop("application shutdown")
+        if session.themes:
+            await session.themes.close()
         if session.camera:
             await session.camera.close()
         if tracker_task is not None:

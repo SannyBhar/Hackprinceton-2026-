@@ -8,6 +8,7 @@ import math
 import copy
 from typing import Any, Optional
 
+from .errors import ConflictError, InvalidError
 from .compiler import DEFAULT_MAX_STEPS, PlanResult, plan
 from .grading import Grader, reduce_tile, summarize
 from .models import (HEADING_DEG, Cell, Corner, Instruction, ProjectionSettings,
@@ -20,14 +21,6 @@ from .tracking import CellEntryDetector, TrackerConfig
 from .vision.cards import CardRecognizer
 
 S = SessionState
-
-
-class ConflictError(Exception):
-    """Action not allowed in the current session state (HTTP 409)."""
-
-
-class InvalidError(Exception):
-    """Request content invalid (HTTP 400)."""
 
 
 def now_ms() -> int:
@@ -56,6 +49,7 @@ class Session:
         self.puzzle: Puzzle = puzzles[0]
         self.calibration = storage.load_calibration() or default_calibration()
         saved = storage.get_record("settings", "session") or {}
+        self.puzzle = next((p for p in puzzles if p.id == saved.get("activePuzzleId")), puzzles[0])
         self.student_id = saved.get("studentId")
         self.projection = ProjectionSettings.model_validate(saved.get("projection", {}))
         self.scan: Optional[ScanResult] = None
@@ -78,6 +72,8 @@ class Session:
 
         from .joystick import ContinuousRecorder
         self.joystick = ContinuousRecorder(self)
+        self._validated_artwork = None
+        self.themes = None
         self.camera = None
         self.scan_busy = False
         self.session_id = uuid.uuid4().hex
@@ -107,10 +103,15 @@ class Session:
 
     def _publish(self, type_: str, payload: Any):
         self.seq += 1
-        msg = {"seq": self.seq, "type": type_, "payload": payload}
+        if type_ == "snapshot":
+            payload = {**payload, "seq":self.seq}
+        msg = {"sessionId":self.session_id, "runId":self.attempt["id"] if self.attempt else None,
+               "seq": self.seq, "type": type_, "payload": payload}
         for q in list(self.subscribers):
             if q.qsize() > 500:  # slow client: drop it, it will reconnect and resnapshot
                 self.subscribers.discard(q)
+                while not q.empty(): q.get_nowait()
+                q.put_nowait(None)
             else:
                 q.put_nowait(msg)
 
@@ -139,7 +140,7 @@ class Session:
     def _save_settings(self):
         self.persist(self.storage.put_record, "settings", "session", {
             "joystick": {"active": self.joystick.active, "error": self.joystick.error},
-            "studentId": self.student_id, "projection": self.projection.model_dump(mode="json")})
+            "activePuzzleId": self.puzzle.id, "studentId": self.student_id, "projection": self.projection.model_dump(mode="json")})
 
     def changed(self):
         self._publish("snapshot", self.snapshot())
@@ -188,6 +189,11 @@ class Session:
         if self.camera and (p.rows, p.cols) != (self.puzzle.rows, self.puzzle.cols):
             self.camera.invalidate()
         self.puzzle = p
+        if self.projection.artworkId:
+            from .models import puzzle_hash
+            if self.projection.artworkHash != puzzle_hash(p):
+                self.projection = self.projection.model_copy(update={"artworkId":None,"artworkHash":None})
+        self._save_settings()
         self.persist(self.storage.save_puzzle, p)
         self._clear_feedback()
         if self.program:
@@ -208,8 +214,13 @@ class Session:
         self.changed()
 
     def set_projection(self, ps: ProjectionSettings):
-        if self.state in (S.RUNNING, S.RECORDING) and (ps.theme != self.projection.theme or ps.calibrating or ps.testPattern != self.projection.testPattern):
+        if self.state in (S.RUNNING, S.RECORDING) and (ps.theme != self.projection.theme or ps.artworkId != self.projection.artworkId or ps.calibrating or ps.testPattern != self.projection.testPattern):
             raise ConflictError("theme and calibration changes require stopped motors")
+        if ps.artworkId and ps.artworkId != self.projection.artworkId:
+            if self._validated_artwork != (ps.artworkId, ps.artworkHash):
+                raise InvalidError("use the artwork acceptance endpoint")
+        elif ps.artworkId:
+            ps = ps.model_copy(update={"artworkHash":self.projection.artworkHash})
         self.projection = ps
         self._save_settings()
         self.changed()
@@ -408,6 +419,8 @@ class Session:
 
     # ------------------------------------------------------------------ pose ingestion
     def on_pose(self, pose: RobotPose):
+        if self.pose and pose.timestampMs < self.pose.timestampMs:
+            return  # never ingest an older observation after a newer one
         self.joystick.observe(pose)
         self.pose = pose
         if self.detector and self.state in (S.RUNNING, S.RECORDING):

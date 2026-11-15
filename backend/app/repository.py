@@ -3,6 +3,9 @@ from typing import Protocol
 from .models import ProjectorCalibration, Puzzle
 
 
+RECORD_KINDS = {"students", "recordings", "calibrations", "theme_assets", "skill_estimates", "settings"}
+
+
 class Repository(Protocol):
     def list_puzzles(self) -> list[Puzzle]: ...
     def list_library(self) -> list[dict]: ...

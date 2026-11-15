@@ -129,7 +129,7 @@ export function ProgramTab({ snap, onRun }: { snap: Snapshot; onRun: () => void 
       right={
         <BoardCard title={snap.puzzle.name}
                    extra={<span className="muted small">Dotted line = where this program would drive</span>}>
-          <Board puzzle={snap.puzzle} tiles={snap.tiles} pose={snap.pose} theme={snap.projection.theme}
+          <Board puzzle={snap.puzzle} tiles={snap.tiles} pose={snap.pose} theme={snap.projection.theme} artworkUrl={snap.projection.artworkId ? `/api/themes/${snap.projection.artworkId}/image` : null}
                  plannedEntries={check?.ok ? check.plannedEntries : snap.plannedEntries} width="100%" height="auto" />
         </BoardCard>
       }

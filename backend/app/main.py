@@ -15,7 +15,7 @@ from fastapi import FastAPI, File, HTTPException, UploadFile, WebSocket, WebSock
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from .models import Instruction, ProjectionSettings, ProjectorCalibration, Puzzle
 from .robot.simulator import SimulatedRobot
@@ -189,12 +189,15 @@ def sim_fault(body: FaultBody):
 @app.websocket("/ws")
 async def ws(websocket: WebSocket):
     await websocket.accept()
-    q: asyncio.Queue = asyncio.Queue()
+    q: asyncio.Queue = asyncio.Queue(maxsize=512)
     session.subscribers.add(q)
     try:
         await websocket.send_json({"seq": session.seq, "type": "snapshot", "payload": session.snapshot()})
         while True:
             msg = await q.get()
+            if msg is None:
+                await websocket.close(code=1013)
+                return
             await websocket.send_json(msg)
     except (WebSocketDisconnect, RuntimeError):
         pass
@@ -218,13 +221,19 @@ async def camera_role(body: CameraRoleBody):
     return session.camera.status()
 
 
+class CameraCalibrationBody(BaseModel):
+    heightCorrection: float = Field(default=0,ge=-.5,le=.5,allow_inf_nan=False)
+
+
 @app.post("/api/calibration/camera")
-async def camera_calibration():
+async def camera_calibration(body: CameraCalibrationBody | None = None):
     if session.state.value in ("RUNNING", "RECORDING"):
         raise HTTPException(409, "stop motors before calibration")
     if session.camera is None:
         raise HTTPException(400, "camera mode is not configured")
     try:
+        if session.camera._tracker is not None:
+            session.camera._tracker.height_correction = body.heightCorrection if body else 0
         return await session.camera.calibrate()
     except ValueError as e:
         raise HTTPException(400, str(e))
@@ -252,6 +261,8 @@ async def clear_scan():
 
 from .history_api import router as history_router
 app.include_router(history_router(lambda: session))
+from .intelligence_api import router as intelligence_router
+app.include_router(intelligence_router(lambda: session))
 
 
 # Serve the built frontend (npm run build) so one process runs the whole app.

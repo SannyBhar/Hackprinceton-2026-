@@ -53,10 +53,11 @@ const uint32_t HEARTBEAT_TIMEOUT_MS = 1000;
 struct Motion { bool active; uint32_t endAt; String msgId; uint8_t client; };
 Motion motion = {false, 0, "", 0};
 uint32_t lastHeartbeat = 0;
-String recentIds[16]; int recentHead = 0;
+String recentIds[128]; int recentHead = 0;
+int controlClient = -1;
 
 bool seen(const String& id) { for (auto& s : recentIds) if (s == id) return true; return false; }
-void remember(const String& id) { recentIds[recentHead] = id; recentHead = (recentHead + 1) % 16; }
+void remember(const String& id) { recentIds[recentHead] = id; recentHead = (recentHead + 1) % 128; }
 
 void setMotor(int i, int duty) {   // duty -255..255
   if (MOTOR_IN1[i] < 0) return;    // pins not configured: refuse to drive
@@ -85,6 +86,7 @@ void handleCmd(uint8_t client, JsonDocument& d) {
   String kind = d["kind"] | "";
   int value = d["value"] | 0;
   if (kind == "STOP") { finishMotion("STOPPED"); sendAck(client, msgId, "DONE"); return; }
+  if (!d["value"].is<int>()) { finishMotion("STOPPED"); sendAck(client,msgId,"ERROR","value must be an integer"); return; }
   if (msgId.length() == 0 || msgId.length() > 64) {
     finishMotion("STOPPED"); sendAck(client, msgId, "ERROR", "invalid msgId"); return;
   }
@@ -137,15 +139,18 @@ void handleDrive(uint8_t client, JsonDocument& d) {
 
 void onWs(uint8_t client, WStype_t type, uint8_t* payload, size_t len) {
   if (type == WStype_CONNECTED) {
+    if (controlClient >= 0 && controlClient != client) { ws.disconnect(client); return; }
+    controlClient = client;
     // Starting a new control connection never resumes movement.
     finishMotion("STOPPED"); continuousActive=false; driveSeq=-1;
     ws.sendTXT(client,"{\"type\":\"hello\",\"protocolVersion\":2}"); return;
   }
-  if (type == WStype_DISCONNECTED) { finishMotion("STOPPED"); continuousActive=false; return; }
+  if (type == WStype_DISCONNECTED) { if (client==controlClient) { finishMotion("STOPPED"); continuousActive=false; controlClient=-1; } return; }
   if (type != WStype_TEXT) return;
   JsonDocument d;
   if (deserializeJson(d, payload, len)) { finishMotion("STOPPED"); continuousActive=false; return; }
   String t = d["type"] | "";
+  if (client != controlClient) return;
   if (t == "hb") lastHeartbeat = millis();
   else if (t == "drive") { lastHeartbeat = millis(); handleDrive(client,d); }
   else if (t == "cmd") {

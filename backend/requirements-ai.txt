@@ -1,0 +1,2 @@
+# HTTPX comes from core requirements; Pillow validates/caches generated image data.
+Pillow==11.3.0

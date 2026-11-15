@@ -71,7 +71,7 @@ class Storage:
 
     def _record_path(self, kind, id):
         import re
-        from .sqlite_store import KINDS
+        from .repository import RECORD_KINDS as KINDS
         if kind not in KINDS or not re.fullmatch(r"[A-Za-z0-9_-]{1,80}", id):
             raise ValueError("invalid record identifier")
         path = self.dir / kind / (id + ".json")

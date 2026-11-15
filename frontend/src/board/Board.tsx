@@ -17,6 +17,7 @@ type Props = {
   pose?: RobotPose | null;
   plannedEntries?: Cell[];
   theme?: string;
+  artworkUrl?: string | null;
   showGrid?: boolean;
   showIndices?: boolean;
   showRobot?: boolean;
@@ -147,6 +148,8 @@ export function Board(p: Props) {
           </g>
         );
       })}
+
+      {p.artworkUrl && <image href={p.artworkUrl} width={W} height={H} preserveAspectRatio="xMidYMid slice" opacity={0.65} />}
 
       {/* Layer 2: exact route cues (app-rendered, never derived from artwork) */}
       {route.length > 1 && (

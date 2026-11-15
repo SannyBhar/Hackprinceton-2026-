@@ -1,5 +1,5 @@
 import type {
-  Attempt, Recording, Student, Cell, Instruction, ProjectionSettings, ProjectorCalibration, Puzzle, PuzzleListItem, ScanResult,
+  ThemeJob, ProgressReport, Recommendation, Attempt, Recording, Student, Cell, Instruction, ProjectionSettings, ProjectorCalibration, Puzzle, PuzzleListItem, ScanResult,
 } from './types';
 
 async function call<T>(method: string, path: string, body?: unknown): Promise<T> {
@@ -17,6 +17,13 @@ async function call<T>(method: string, path: string, body?: unknown): Promise<T>
 }
 
 export const api = {
+  themes: () => call<ThemeJob[]>('GET','/api/themes'),
+  generateTheme: (text:string) => call<ThemeJob>('POST','/api/themes',{text}),
+  acceptTheme: (id:string) => call('POST',`/api/themes/${encodeURIComponent(id)}/accept`),
+  cancelTheme: (id:string) => call('DELETE',`/api/themes/${encodeURIComponent(id)}`),
+  progress: (id:string) => call<ProgressReport>('GET',`/api/students/${encodeURIComponent(id)}/progress`),
+  recommendations: (id:string) => call<Recommendation[]>('GET',`/api/students/${encodeURIComponent(id)}/recommendations`),
+  annotateSkill: (id:string,skill:string,correct:boolean) => call('POST',`/api/attempts/${encodeURIComponent(id)}/evidence`,{skill,correct}),
   students: () => call<Student[]>('GET','/api/students'),
   createStudent: (name:string) => call<Student>('POST','/api/students',{name}),
   selectStudent: (studentId:string|null) => call('PUT','/api/student',{studentId}),
@@ -34,7 +41,7 @@ export const api = {
   saveCalibration: (c: ProjectorCalibration) => call('PUT', '/api/calibration/projector', c),
   setProjection: (p: ProjectionSettings) => call('PUT', '/api/projection', p),
   cameraRole: (role: 'scan' | 'track' | 'closed') => call('POST', '/api/camera/role', { role }),
-  calibrateCamera: () => call('POST', '/api/calibration/camera'),
+  calibrateCamera: (heightCorrection=0) => call('POST', '/api/calibration/camera',{heightCorrection}),
   clearScan: () => call('DELETE', '/api/scan'),
   scan: () => call<ScanResult>('POST', '/api/scan'),
   validate: (instructions: Instruction[]) =>

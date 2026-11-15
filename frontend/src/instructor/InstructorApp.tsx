@@ -1,3 +1,4 @@
+import { IntelligenceTab } from './IntelligenceTab';
 import { HistoryTab } from './HistoryTab';
 import { openProjectionWindow } from '../projection/window';
 export { openProjectionWindow } from '../projection/window';
@@ -18,6 +19,7 @@ const TABS = [
   ['live', '4', 'Run'],
   ['record', '◉', 'Record'],
   ['history', '5', 'History'],
+  ['intelligence', '6', 'Themes & Progress'],
 ] as const;
 type Tab = (typeof TABS)[number][0];
 
@@ -60,6 +62,7 @@ export function InstructorApp() {
         {tab === 'puzzle' && <PuzzleEditor snap={snap} onUse={() => setTab('program')} />}
         {tab === 'program' && <ProgramTab snap={snap} onRun={() => setTab('live')} />}
         {tab === 'live' && <LiveTab snap={snap} />}
+        {tab === 'intelligence' && <IntelligenceTab snap={snap} />}
         {tab === 'history' && <HistoryTab snap={snap} />}
         {tab === 'record' && <RecordingTab snap={snap} />}
       </main>

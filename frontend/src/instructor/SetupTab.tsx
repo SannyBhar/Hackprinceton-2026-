@@ -11,6 +11,7 @@ const LABELS = ['TL', 'TR', 'BR', 'BL'];
 
 export function SetupTab({ snap }: { snap: Snapshot }) {
   const { run, error } = useAction();
+  const [heightCorrection,setHeightCorrection] = useState(0);
   const [step, setStep] = useState(5);
   const cal = snap.calibration;
   const ps = snap.projection;
@@ -38,10 +39,11 @@ export function SetupTab({ snap }: { snap: Snapshot }) {
             <div className="row">
               <button disabled={moving} onClick={() => run(() => api.cameraRole('scan'))}>Scan camera</button>
               <button disabled={moving} onClick={() => run(() => api.cameraRole('track'))}>Arena tracking</button>
-              <button disabled={moving} onClick={() => run(() => api.calibrateCamera())}>Validate camera calibration</button>
+              <button disabled={moving} onClick={() => run(() => api.calibrateCamera(heightCorrection))}>Validate camera calibration</button>
               <button disabled={moving} onClick={() => run(() => api.cameraRole('closed'))}>Close camera</button>
             </div>
             <p>After scanning, return the camera to the arena. Show all four corner markers and the robot marker, then validate. Any repositioning requires revalidation.</p>
+            <label>Measured marker-height correction <input type="number" min={-.5} max={.5} step={.01} value={heightCorrection} disabled={moving} onChange={e=>setHeightCorrection(Number(e.target.value))}/></label>
             <CameraPreview />
             {snap.camera.error && <div className="error">{snap.camera.error}</div>}
           </Card>}
@@ -133,7 +135,7 @@ export function SetupTab({ snap }: { snap: Snapshot }) {
       }
       right={
         <BoardCard title="Board preview" extra={<span className="muted small">Projection shows this warped onto your corners — without the rover</span>}>
-          <Board puzzle={snap.puzzle} tiles={snap.tiles} pose={snap.pose} theme={ps.theme} roverAtStart
+          <Board puzzle={snap.puzzle} tiles={snap.tiles} pose={snap.pose} theme={ps.theme} artworkUrl={ps.artworkId ? `/api/themes/${ps.artworkId}/image` : null} roverAtStart
                  showGrid={cal.showGrid} markerMask={cal.markerMask} testPattern={ps.testPattern} width="100%" height="auto" />
         </BoardCard>
       }
