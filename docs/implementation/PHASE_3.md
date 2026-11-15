@@ -1,3 +1,6 @@
+> Historical phase record. Current hardware/build instructions and verification status:
+> [stabilization](STABILIZATION.md) and [Mac runbook](../MAC_HARDWARE_SETUP.md).
+
 # Phase 3 — themes, learning and acceptance
 
 Nano Banana adapter uses Gemini Interactions REST with model configuration, backend-only

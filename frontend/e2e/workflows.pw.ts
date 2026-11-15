@@ -56,3 +56,14 @@ test('progress recommendations need instructor approval and themes retain static
   await expect(page.getByRole('button',{name:'Use static theme',exact:true})).toBeEnabled();
   await page.screenshot({path:'../work/integrated-progress.png',fullPage:true});
 });
+
+test('readiness and live joystick status are visible; serial errors do not disappear',async({page})=>{
+  await page.goto('/');
+  await page.getByRole('button',{name:/Setup$/}).click();
+  await expect(page.getByText(/Ready to move/)).toBeVisible();
+  await page.getByRole('button',{name:/Record$/}).click();
+  await expect(page.getByText(/Disconnected · neutral \/ released input required · stale/)).toBeVisible();
+  await page.route('**/api/joystick/sample',r=>r.fulfill({status:409,json:{detail:'Joystick input compatibility error'}}));
+  await expect(page.getByText('Joystick input compatibility error')).toBeVisible();
+  await expect(page.getByRole('button',{name:'■ STOP',exact:true})).toBeVisible();
+});

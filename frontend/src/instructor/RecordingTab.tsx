@@ -44,7 +44,7 @@ export function RecordingTab({ snap }: { snap: Snapshot }) {
       left={
         <>
           <Card title="Continuous joystick" subtitle="The separate ESP32-S3 sends axes/button over USB serial. Neutral, stale input, and disconnect stop motors. Review generated code in History.">
-            <p>{snap.joystick?.active ? 'Continuous recording active' : 'Waiting for physical joystick button'} · {snap.robot.continuousSupported ? 'continuous protocol ready' : 'continuous firmware unavailable'}</p>
+            <p>{snap.joystick?.active ? 'Continuous recording active' : `${snap.joystick?.connected ? 'Connected' : 'Disconnected'} · ${snap.joystick?.armed ? 'armed' : 'neutral / released input required'} · ${snap.joystick?.fresh ? 'fresh' : 'stale'}`} · {snap.robot.continuousSupported ? 'continuous protocol ready' : 'continuous firmware unavailable'}</p>
             {snap.joystick?.error && <p className="warn">{snap.joystick.error}</p>}
             {snap.robot.adapter === 'simulator' && <ContinuousSimulator />}
           </Card>
@@ -104,13 +104,14 @@ function ContinuousSimulator() {
   const seq=useRef(Date.now());
   const input=useRef({x:0,y:0,button:false});
   const {run,error}=useAction();
+  const [inputError,setInputError]=useState<string|null>(null);
   useEffect(()=>{
-    const timer=window.setInterval(()=>{api.joystickSample({protocolVersion:1,seq:seq.current++,timestampMs:Date.now(),...input.current}).catch(()=>{});},50);
-    return ()=>{window.clearInterval(timer);api.stop().catch(()=>{});};
+    const timer=window.setInterval(()=>{api.joystickSample({protocolVersion:1,seq:seq.current++,timestampMs:Date.now(),...input.current}).then(()=>setInputError(null)).catch(e=>setInputError(e.message));},50);
+    return ()=>{window.clearInterval(timer);api.stop().catch(e=>console.error("Stop request failed",e));};
   },[]);
   const buttons=[['Forward',0,-.4],['Backward',0,.4],['Left',-.4,0],['Right',.4,0]] as const;
   return <><p>Simulator-only continuous input: hold a direction; release to stop.</p>
     <button onPointerDown={()=>{input.current.button=true;}} onPointerUp={()=>{input.current.button=false;}} onPointerLeave={()=>{input.current.button=false;}}>Recording button (press/release)</button>
     {buttons.map(([label,x,y])=><button key={label} onPointerDown={()=>{input.current.x=x;input.current.y=y;}} onPointerUp={()=>{input.current.x=0;input.current.y=0;}} onPointerLeave={()=>{input.current.x=0;input.current.y=0;}}>{label}</button>)}
-    <button onClick={()=>run(()=>api.stop())}>Stop continuous</button><ErrorBox error={error}/></>;
+    <button onClick={()=>run(()=>api.stop())}>Stop continuous</button><ErrorBox error={error ?? inputError}/></>;
 }

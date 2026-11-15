@@ -1,3 +1,6 @@
+> Historical phase record. Current hardware/build instructions and verification status:
+> [stabilization](STABILIZATION.md) and [Mac runbook](../MAC_HARDWARE_SETUP.md).
+
 # Phase 2 — persistence, capture and reverse coding
 
 Phase 2 is stacked on Phase 1. Backend suite: 55 passed (includes synthetic ArUco camera

@@ -11,3 +11,11 @@ work/
 firmware/.pio/
 playwright-report/
 test-results/
+
+# Private runtime credentials and measured hardware profiles
+.env
+.env.*
+!.env.example
+*.local.env
+hardware.local.json
+firmware/esp32/network.local.h

@@ -58,18 +58,25 @@ class ThemeJobs:
         self.dir.mkdir(parents=True,exist_ok=True)
         self.provider=provider or GeminiThemeProvider()
         self.tasks={}
+        self._creating = asyncio.Lock()
 
     async def list(self):
         return await asyncio.to_thread(self.session.storage.list_records,'theme_assets')
 
     async def create(self,text):
+        async with self._creating:
+            return await self._create(text)
+
+    async def _create(self,text):
         if len([t for t in self.tasks.values() if not t.done()])>=2:raise ValueError('two artwork jobs already active')
         puzzle=self.session.puzzle.model_copy(deep=True)
         job={'id':uuid.uuid4().hex,'status':'GENERATING','themeText':text,'puzzleId':puzzle.id,
              'puzzleVersion':puzzle.version,'puzzleHash':puzzle_hash(puzzle),'createdAt':int(time.time()*1000),
              'model':getattr(self.provider,'model','test-provider'),'provider':'Gemini','promptVersion':1,'accepted':False,'error':None}
         await self.save(job)
-        self.tasks[job['id']]=asyncio.create_task(self._generate(job,puzzle))
+        task = asyncio.create_task(self._generate(job,puzzle))
+        self.tasks[job['id']] = task
+        task.add_done_callback(lambda done: self.tasks.pop(job['id'], None))
         return job
 
     async def save(self,job):
@@ -121,8 +128,15 @@ class ThemeJobs:
 
     async def cancel(self,id):
         task=self.tasks.get(id)
-        if task and not task.done():task.cancel();await asyncio.gather(task,return_exceptions=True)
+        if task and not task.done():
+            task.cancel()
+            await asyncio.gather(task,return_exceptions=True)
+            job = await asyncio.to_thread(self.session.storage.get_record,'theme_assets',id)
+            if job and job['status'] == 'GENERATING':
+                job.update(status='CANCELLED',error='generation cancelled')
+                await self.save(job)
 
     async def close(self):
-        for task in self.tasks.values():task.cancel()
-        await asyncio.gather(*self.tasks.values(),return_exceptions=True)
+        tasks = list(self.tasks.values())
+        for task in tasks:task.cancel()
+        await asyncio.gather(*tasks,return_exceptions=True)

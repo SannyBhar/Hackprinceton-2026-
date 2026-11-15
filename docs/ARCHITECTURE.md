@@ -1,8 +1,8 @@
 # Grassroot — current architecture
 
 See the [full product specification](Grassroot_Project_Architecture.md) and
-[structural brief](Grassroot_Codex_Structural_Refactor.md). Future product requirements
-in those documents are not implemented features.
+[structural brief](Grassroot_Codex_Structural_Refactor.md). Implementation and acceptance status are tracked separately in
+[the requirements matrix](implementation/ACCEPTANCE_MATRIX.md); software existence does not imply physical acceptance.
 
 | Module | Responsibility |
 | --- | --- |
@@ -26,36 +26,29 @@ Concrete adapters are assembled in dependencies/runtime, not inside domain logic
 The pure domain modules do not depend on FastAPI, OpenCV or robot transport.
 The frontend displays authoritative backend tiles and shares one board renderer.
 
-## Extension seams — not implemented features
+## Implemented boundaries
 
-- SQLite: implement Repository's existing methods without changing Session or JSON fixtures.
-  A future history query API should be designed alongside actual persistence requirements.
-- OCR: inject OcrPort into OpenCvCardRecognizer; instructor review remains authoritative.
-- Single camera: inject CameraSource into scanning/tracking. Only OpenCvCameraSource opens
-  webcams. No locking, scheduling, handoff, repositioning or recalibration workflow is provided;
-  existing scan index 0 and track index 1 defaults are deliberately preserved.
-- Joystick: replace/extend the input hook independently of discrete recording compilation.
-  Timestamped analog samples and continuous reconstruction require a future contract/workflow;
-  current records and supported block semantics remain unchanged.
-- AI: Board's decorative theme layer remains separate from geometry and grading. A future
-  backend provider may supply artwork there; learning recommendations must not command motors.
-  No unused AI interfaces, empty packages or runtime dependencies were added.
+- `sqlite_store.py` implements the repository with idempotent JSON imports and versioned records.
+- `vision/coordinator.py` owns one webcam, scan/tracking roles, calibration revalidation and preview.
+  Session reserves conflicting device operations synchronously before asynchronous transitions.
+- `vision/ocr.py` is optional local TrOCR; scores are explicitly uncalibrated and review is mandatory.
+- `joystick.py` acquires synchronized USB protocol-v2 samples independently of drive acknowledgments.
+  Only latest axes are retained for control; a bounded button-edge queue preserves toggles.
+- `hardware.py` validates one private measured profile. Firmware publishes readiness/profile identity
+  and ledger capacity. The default target has disabled outputs; calibration and run builds are distinct.
+- `ai/themes.py` serializes two-job admission and caches decorative backgrounds. No AI path controls
+  geometry, grading or motors. `learning.py` owns transparent BKT/candidates, not device control.
+- `history_api.py` and `intelligence_api.py` expose focused persistence/provider workflows.
+- `firmware/esp32/network_config.h` shares optional private station credentials between both XIAOs;
+  Wi-Fi is independent of the USB joystick protocol. Robot commands remain WebSocket JSON.
 
 ## Compatibility
 
 Public module paths, main.build_session import, InstructorApp.openProjectionWindow export,
 REST routes, WS snapshot/pose messages and sequence policy, JSON paths, fixture IDs,
-robot primitives/acks and Arduino sketch location are retained. Display branding is Grassroot;
+robot primitives and additive acknowledgments and Arduino sketch location are retained. Display branding is Grassroot;
 legacy package name, popup window name and firmware network identifiers remain unchanged.
 No camera or firmware hardware validation is claimed.
 
 
-## Full implementation additions
-
-The implementation notes under `docs/implementation/` supersede the earlier extension-only
-status above. CameraCoordinator owns role/calibration/preview; Session owns the control lease;
-ContinuousRecorder owns timestamped input/trajectory reconstruction; SQLiteStorage implements
-persistence with JSON compatibility; ThemeJobs owns bounded Gemini requests and caches;
-learning.py is a pure BKT/candidate module. history_api/intelligence_api are focused routers.
-Frontend History and Themes & Progress reuse the existing shared types, client and Board.
-The six-command block language, ordered grader and projector geometry remain authoritative.
+See [the stabilization report](implementation/STABILIZATION.md) for additive contracts and pending hardware gates.

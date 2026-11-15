@@ -1,0 +1,204 @@
+{
+  "date": "2026-11-14",
+  "tool": "pip-audit 2.10.1",
+  "scope": "Existing backend Python 3.13 venv, including optional OCR/vision/AI/serial, tests and pip; no upgrades performed",
+  "reportedEntries": 133,
+  "distinctAdvisoryIds": 92,
+  "affectedPackages": [
+    {
+      "name": "pillow",
+      "version": "11.3.0",
+      "reportedEntries": 76,
+      "advisoryIds": [
+        "CVE-2026-112390",
+        "CVE-2026-112391",
+        "CVE-2026-112393",
+        "CVE-2026-112395",
+        "CVE-2026-112399",
+        "CVE-2026-112400",
+        "CVE-2026-112401",
+        "CVE-2026-112404",
+        "CVE-2026-112406",
+        "CVE-2026-112891",
+        "CVE-2026-112892",
+        "CVE-2026-112893",
+        "CVE-2026-112894",
+        "CVE-2026-112895",
+        "CVE-2026-112897",
+        "CVE-2026-112899",
+        "CVE-2026-112900",
+        "CVE-2026-128066",
+        "CVE-2026-128067",
+        "CVE-2026-96638",
+        "CVE-2026-96640",
+        "CVE-2026-96778",
+        "GHSA-78g4-xqwv-q3g8",
+        "PYSEC-2026-165",
+        "PYSEC-2026-2249",
+        "PYSEC-2026-2250",
+        "PYSEC-2026-2251",
+        "PYSEC-2026-2252",
+        "PYSEC-2026-2253",
+        "PYSEC-2026-2254",
+        "PYSEC-2026-2255",
+        "PYSEC-2026-2256",
+        "PYSEC-2026-2257",
+        "PYSEC-2026-2874",
+        "PYSEC-2026-3451",
+        "PYSEC-2026-3453",
+        "PYSEC-2026-3454",
+        "PYSEC-2026-3493",
+        "PYSEC-2026-3494",
+        "PYSEC-2026-3495",
+        "PYSEC-2026-3496",
+        "PYSEC-2026-4326",
+        "PYSEC-2026-4327",
+        "PYSEC-2026-4328",
+        "PYSEC-2026-4329",
+        "PYSEC-2026-4330",
+        "PYSEC-2026-4331",
+        "PYSEC-2026-4332",
+        "PYSEC-2026-4334",
+        "PYSEC-2026-4335",
+        "PYSEC-2026-4336",
+        "PYSEC-2026-4337",
+        "PYSEC-2026-4338",
+        "PYSEC-2026-4339",
+        "PYSEC-2026-4340",
+        "PYSEC-2026-4341",
+        "PYSEC-2026-4342",
+        "PYSEC-2026-4343",
+        "PYSEC-2026-4363"
+      ],
+      "fixVersionsReported": [
+        "12.1.1",
+        "12.2.0",
+        "12.3.0",
+        "13.0.0"
+      ]
+    },
+    {
+      "name": "pip",
+      "version": "24.2",
+      "reportedEntries": 12,
+      "advisoryIds": [
+        "PYSEC-2026-1795",
+        "PYSEC-2026-1796",
+        "PYSEC-2026-196",
+        "PYSEC-2026-2875",
+        "PYSEC-2026-2876",
+        "PYSEC-2026-3721"
+      ],
+      "fixVersionsReported": [
+        "25.3",
+        "26.0",
+        "26.1",
+        "26.1.2",
+        "26.2",
+        "26.2.0"
+      ]
+    },
+    {
+      "name": "protobuf",
+      "version": "6.33.0",
+      "reportedEntries": 2,
+      "advisoryIds": [
+        "PYSEC-2026-1805"
+      ],
+      "fixVersionsReported": [
+        "5.29.6",
+        "6.33.5"
+      ]
+    },
+    {
+      "name": "pytest",
+      "version": "8.3.4",
+      "reportedEntries": 2,
+      "advisoryIds": [
+        "PYSEC-2026-1845"
+      ],
+      "fixVersionsReported": [
+        "9.0.3"
+      ]
+    },
+    {
+      "name": "python-multipart",
+      "version": "0.0.20",
+      "reportedEntries": 12,
+      "advisoryIds": [
+        "PYSEC-2026-1852",
+        "PYSEC-2026-3036",
+        "PYSEC-2026-3037",
+        "PYSEC-2026-3038",
+        "PYSEC-2026-3039",
+        "PYSEC-2026-3040"
+      ],
+      "fixVersionsReported": [
+        "0.0.22",
+        "0.0.26",
+        "0.0.27",
+        "0.0.30",
+        "0.0.31"
+      ]
+    },
+    {
+      "name": "starlette",
+      "version": "0.41.3",
+      "reportedEntries": 14,
+      "advisoryIds": [
+        "PYSEC-2026-161",
+        "PYSEC-2026-1941",
+        "PYSEC-2026-1942",
+        "PYSEC-2026-2280",
+        "PYSEC-2026-2281",
+        "PYSEC-2026-248",
+        "PYSEC-2026-249"
+      ],
+      "fixVersionsReported": [
+        "0.47.2",
+        "0.49.1",
+        "1.0.1",
+        "1.1.0",
+        "1.3.0",
+        "1.3.1"
+      ]
+    },
+    {
+      "name": "torch",
+      "version": "2.9.1",
+      "reportedEntries": 5,
+      "advisoryIds": [
+        "PYSEC-2025-194",
+        "PYSEC-2025-195",
+        "PYSEC-2026-139",
+        "PYSEC-2026-1856",
+        "PYSEC-2026-2286"
+      ],
+      "fixVersionsReported": [
+        "2.10.0",
+        "2.13.0"
+      ]
+    },
+    {
+      "name": "transformers",
+      "version": "4.57.1",
+      "reportedEntries": 10,
+      "advisoryIds": [
+        "PYSEC-2025-217",
+        "PYSEC-2025-218",
+        "PYSEC-2026-2288",
+        "PYSEC-2026-2289",
+        "PYSEC-2026-2290",
+        "PYSEC-2026-3929",
+        "PYSEC-2026-4174"
+      ],
+      "fixVersionsReported": [
+        "5.0.0",
+        "5.0.0rc3",
+        "5.10.0",
+        "5.3.0",
+        "5.5.0"
+      ]
+    }
+  ]
+}

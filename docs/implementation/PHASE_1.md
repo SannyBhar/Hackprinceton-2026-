@@ -1,3 +1,6 @@
+> Historical phase record. Current hardware/build instructions and verification status:
+> [stabilization](STABILIZATION.md) and [Mac runbook](../MAC_HARDWARE_SETUP.md).
+
 # Phase 1 — physical core
 
 Base: integrated main b33facb. Baseline: 42 backend / 6 frontend tests, build and typecheck passed.

@@ -1,9 +1,14 @@
+> Current hardware override: both boards are XIAO ESP32-S3; joystick button is GPIO3
+> (superseding the specification's provisional GPIO4). Cell 22 cm; supply 6 V; motor rating,
+> polarity and timings unverified. See [stabilization gates](STABILIZATION.md) and
+> [the calibration runbook](../MAC_HARDWARE_SETUP.md). Original requirement text below is retained.
+
 # Complete-specification traceability
 
 Source: `docs/Grassroot_Project_Architecture.md` (unchanged). Rows enumerate all specification
 headings, bullet requirements and table rows with source line numbers. Subordinate prose is
 covered by its containing section. User decisions supersede provisional source examples:
-XIAO GPIO1/2/3/4/5/6/43/44 with SLP tied to 3V3; joystick pins await wiring; turns are in-place;
+XIAO GPIO1/2/3/4/5/6/43/44 with SLP tied to 3V3; joystick X/Y/button GPIO1/2/3 confirmed; turns are in-place;
 robot uses existing Wi-Fi, controller uses USB serial, local OCR and Nano Banana artwork.
 
 **Implemented software is not physical acceptance.** All electrical, actual robot, joystick,
@@ -99,19 +104,19 @@ re-executes an old ID. A power cycle clears history; the backend never retries a
 | 229 | Stop on malformed messages, loss of control lease, heartbeat timeout, safety fault or explicit emergency stop. | 1/2 | firmware robot target; motor wiring docs | Build passed; electrical/motion tests PENDING, outputs disabled |
 | 230 | Publish telemetry and fault state. Completed motor command ≠ observed physical completion. | 1/2 | firmware robot target; motor wiring docs | Build passed; electrical/motion tests PENDING, outputs disabled |
 | 231 | Permit **exactly one** active control owner (forward program **or** joystick), never both. | 1/2 | firmware robot target; motor wiring docs | Build passed; electrical/motion tests PENDING, outputs disabled |
-| 235 | ## 5. Hardware B — independent continuous joystick | 2 | joystick firmware/joystick.py; capture tests | Build + simulator passed; actual board/pins and serial test PENDING |
-| 237 | /  Component  /  Qty  /  Notes  / | 2 | joystick firmware/joystick.py; capture tests | Build + simulator passed; actual board/pins and serial test PENDING |
-| 239 | /  Two-axis analog joystick with integrated press switch  /  1  /  Analog X/Y + digital button  / | 2 | joystick firmware/joystick.py; capture tests | Build + simulator passed; actual board/pins and serial test PENDING |
-| 240 | /  Separate ESP32-S3 or ADC-capable microcontroller  /  1  /  **Exact board unverified**; USB serial is preferred for MVP  / | 2 | joystick firmware/joystick.py; capture tests | Build + simulator passed; actual board/pins and serial test PENDING |
-| 241 | /  USB data/power cable  /  1  /  Computer connection; wireless + battery is stretch  / | 2 | joystick firmware/joystick.py; capture tests | Build + simulator passed; actual board/pins and serial test PENDING |
-| 242 | /  Breadboard/headers/wires and enclosure  /  Set  /  Secure analog connections and switch  / | 2 | joystick firmware/joystick.py; capture tests | Build + simulator passed; actual board/pins and serial test PENDING |
-| 243 | /  Optional 3D-printed joystick box  /  1  /  Mechanical engineers / 3D printer can help  / | 2 | joystick firmware/joystick.py; capture tests | Build + simulator passed; actual board/pins and serial test PENDING |
-| 247 | /  Joystick  /  Microcontroller  / | 2 | joystick firmware/joystick.py; capture tests | Build + simulator passed; actual board/pins and serial test PENDING |
-| 249 | /  VCC  /  3.3V **only if the module supports it**  / | 2 | joystick firmware/joystick.py; capture tests | Build + simulator passed; actual board/pins and serial test PENDING |
-| 250 | /  GND  /  GND  / | 2 | joystick firmware/joystick.py; capture tests | Build + simulator passed; actual board/pins and serial test PENDING |
-| 251 | /  VRx  /  GPIO 1 ADC  / | 2 | joystick firmware/joystick.py; capture tests | Build + simulator passed; actual board/pins and serial test PENDING |
-| 252 | /  VRy  /  GPIO 2 ADC  / | 2 | joystick firmware/joystick.py; capture tests | Build + simulator passed; actual board/pins and serial test PENDING |
-| 253 | /  SW  /  GPIO 4 with input pull-up  / | 2 | joystick firmware/joystick.py; capture tests | Build + simulator passed; actual board/pins and serial test PENDING |
+| 235 | ## 5. Hardware B — independent continuous joystick | 2 | joystick firmware/joystick.py; capture tests | Build + simulator passed; XIAO board/pins confirmed; physical serial acceptance PENDING |
+| 237 | /  Component  /  Qty  /  Notes  / | 2 | joystick firmware/joystick.py; capture tests | Build + simulator passed; XIAO board/pins confirmed; physical serial acceptance PENDING |
+| 239 | /  Two-axis analog joystick with integrated press switch  /  1  /  Analog X/Y + digital button  / | 2 | joystick firmware/joystick.py; capture tests | Build + simulator passed; XIAO board/pins confirmed; physical serial acceptance PENDING |
+| 240 | /  Separate ESP32-S3 or ADC-capable microcontroller  /  1  /  **Exact board unverified**; USB serial is preferred for MVP  / | 2 | joystick firmware/joystick.py; capture tests | Build + simulator passed; XIAO board/pins confirmed; physical serial acceptance PENDING |
+| 241 | /  USB data/power cable  /  1  /  Computer connection; wireless + battery is stretch  / | 2 | joystick firmware/joystick.py; capture tests | Build + simulator passed; XIAO board/pins confirmed; physical serial acceptance PENDING |
+| 242 | /  Breadboard/headers/wires and enclosure  /  Set  /  Secure analog connections and switch  / | 2 | joystick firmware/joystick.py; capture tests | Build + simulator passed; XIAO board/pins confirmed; physical serial acceptance PENDING |
+| 243 | /  Optional 3D-printed joystick box  /  1  /  Mechanical engineers / 3D printer can help  / | 2 | joystick firmware/joystick.py; capture tests | Build + simulator passed; XIAO board/pins confirmed; physical serial acceptance PENDING |
+| 247 | /  Joystick  /  Microcontroller  / | 2 | joystick firmware/joystick.py; capture tests | Build + simulator passed; XIAO board/pins confirmed; physical serial acceptance PENDING |
+| 249 | /  VCC  /  3.3V **only if the module supports it**  / | 2 | joystick firmware/joystick.py; capture tests | Build + simulator passed; XIAO board/pins confirmed; physical serial acceptance PENDING |
+| 250 | /  GND  /  GND  / | 2 | joystick firmware/joystick.py; capture tests | Build + simulator passed; XIAO board/pins confirmed; physical serial acceptance PENDING |
+| 251 | /  VRx  /  GPIO 1 ADC  / | 2 | joystick firmware/joystick.py; capture tests | Build + simulator passed; XIAO board/pins confirmed; physical serial acceptance PENDING |
+| 252 | /  VRy  /  GPIO 2 ADC  / | 2 | joystick firmware/joystick.py; capture tests | Build + simulator passed; XIAO board/pins confirmed; physical serial acceptance PENDING |
+| 253 | /  SW  /  GPIO 4 with input pull-up  / | 2 | joystick firmware/joystick.py; capture tests | Build + simulator passed; XIAO board/pins confirmed; physical serial acceptance PENDING |
 | 261 | ## 6. Hardware C — one camera, physical cards, passive projector | 1 | vision coordinator/camera tracker/projection; homography + browser tests | Synthetic/browser tests; physical optics/camera/parallax PENDING |
 | 263 | ### 6.1 Inventory and physical layout | 1 | vision coordinator/camera tracker/projection; homography + browser tests | Synthetic/browser tests; physical optics/camera/parallax PENDING |
 | 265 | /  Part  /  Qty  /  Purpose  / | 1 | vision coordinator/camera tracker/projection; homography + browser tests | Synthetic/browser tests; physical optics/camera/parallax PENDING |

@@ -1,9 +1,8 @@
 #pragma once
 
-// Proposed Seeed Studio XIAO ESP32-S3 / two Adafruit DRV8833 pin map.
+// Confirmed Seeed Studio XIAO ESP32-S3 / two Adafruit DRV8833 pin map.
 // Raw ESP32 GPIO numbers, NOT XIAO D-label numbers. Physical wiring unverified.
-// Reference only: intentionally not connected to the active MOTOR_IN1/MOTOR_IN2
-// arrays. Adding this configuration does not enable motor output.
+// Active only in explicit calibration/run profiles. Default outputs remain disabled.
 namespace grassroot_hardware {
 constexpr int LF_IN1 = 1;   // D0 -> driver 1 AIN1
 constexpr int LF_IN2 = 2;   // D1 -> driver 1 AIN2
@@ -13,5 +12,5 @@ constexpr int RF_IN1 = 5;   // D4 -> driver 2 AIN1
 constexpr int RF_IN2 = 6;   // D5 -> driver 2 AIN2
 constexpr int RR_IN1 = 43;  // D6 -> driver 2 BIN1 (NOT GPIO6)
 constexpr int RR_IN2 = 44;  // D7 -> driver 2 BIN2 (NOT GPIO7)
-// No SLP GPIO: both driver SLP pins are wired directly to 3V3 in this proposal.
+// No SLP GPIO: both driver SLP pins are wired directly to 3V3 in the confirmed pin map.
 }  // namespace grassroot_hardware

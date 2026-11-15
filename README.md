@@ -17,7 +17,7 @@ Hardware: [docs/HARDWARE_CHECKLIST.md](docs/HARDWARE_CHECKLIST.md)
 One-time setup:
 
 ```bash
-python3 -m venv backend/.venv && backend/.venv/bin/pip install -r backend/requirements.txt
+python3.13 -m venv backend/.venv && backend/.venv/bin/pip install -r backend/requirements.txt
 ```
 
 ```bash
@@ -85,7 +85,7 @@ docs/             build plan, assumptions, projection setup, hardware checklist
 | --- | --- | --- |
 | `CA_ROBOT` | `sim` (default) / `esp32` | `CA_ROBOT_URL=ws://192.168.4.1:81/` |
 | `CA_CARDS` | `fixture` (default) / `opencv` | `CA_CARD_CAMERA=0`; needs `requirements-vision.txt` |
-| `CA_TRACKER` | unset / `camera` | `CA_TRACK_CAMERA=1`; pose from overhead camera |
+| `CA_TRACKER` | unset / `camera` | shared `GRASSROOT_CAMERA=0`; pose from arena webcam |
 
 **Status labels:** everything under "Tests" runs against the simulator. The ESP32 transport,
 firmware, OpenCV card reader and camera tracker are written but **not verified on hardware**.
@@ -95,18 +95,15 @@ firmware, OpenCV card reader and camera tracker are written but **not verified o
 Backend settings are assembled in `app/settings.py` and adapters in `app/dependencies.py`.
 Every `CA_*` variable above (plus `CA_DATA_DIR`) remains supported. Equivalent
 `GRASSROOT_*` variables take precedence; see `backend/settings.env.example`.
-Existing camera indices (scan 0, tracker 1) are retained for compatibility. The injected
-camera interface does **not** implement single-camera scheduling or handoff.
+The shared webcam has explicit Scan/Arena roles and revalidation. SQLite is the default;
+OCR, USB continuous recording, cached Gemini artwork and local progress workflows are
+implemented in software. Physical verification remains pending.
 
-The current implementation uses JSON storage, discrete keyboard/gamepad recording,
-manual numeric review and static themes. OCR models, continuous joystick reconstruction,
-SQLite and AI providers are **not implemented** by this refactor. The supplied full product
-specification includes future work; it is not a claim of current functionality.
-
+Use the [Mac setup and calibration runbook](docs/MAC_HARDWARE_SETUP.md) for the confirmed
+XIAO boards, 22 cm grid, private Wi-Fi configuration and measured-motion gates.
 Additional verification: `npm --prefix frontend run typecheck` and
 `npm --prefix frontend run build`. No lint script or backend static type checker is configured.
-The baseline npm install reported **8 vulnerabilities (2 moderate, 4 high, 2 critical)**.
-Dependency upgrades are deferred; package manifests and lockfiles were not changed.
+See [dependency findings](docs/implementation/DEPENDENCIES.md); this stabilization does not upgrade dependencies.
 
 ## Full implementation: three review phases
 
@@ -124,7 +121,7 @@ These notes distinguish implemented software from still-pending physical accepta
 - **OCR:** optional `backend/requirements-ocr.txt`, `GRASSROOT_OCR=local`, writable `HF_HOME`.
   Cache weights while online. Uncertain/unavailable recognition falls back to instructor input.
 - **Joystick:** optional `backend/requirements-joystick.txt`, `GRASSROOT_JOYSTICK_PORT`.
-  The second board uses USB serial. Its wiring is still unassigned pending the team's commit.
+  The second XIAO ESP32-S3 uses protocol-v2 USB serial: X GPIO1, Y GPIO2, button GPIO3, 3V3 power.
 - **Artwork:** install `backend/requirements-ai.txt`; configure backend `GEMINI_API_KEY` and
   optionally `GRASSROOT_THEME_MODEL`. Never put a key in Vite settings. Themes & Progress
   provides preview/accept/cancel/static fallback. Pre-cache before joining the robot AP if
@@ -132,16 +129,16 @@ These notes distinguish implemented software from still-pending physical accepta
 - **History/progress:** use local aliases in History; inspect/export attempts and approximate
   recordings. Review warnings before loading generated programs. Recommendations never run
   the robot; an instructor explicitly approves the next puzzle.
-- **Firmware:** `pip install platformio==6.1.18`, then `pio run -d firmware`; upload a verified
-  target with `pio run -d firmware -e robot -t upload` via USB-C. Both robot and joystick build
-  targets default to disabled/unassigned pins. Do not enable or flash unverified hardware.
+- **Firmware:** `pip install platformio==6.1.18`, then `pio run -d firmware`. The default robot
+  outputs are disabled. `robot-calibration` allows instructor-confirmed one-shot pulses;
+  `robot-calibrated` requires the private measured hardware profile. See the runbook before upload.
 - **Browser tests:** `npm --prefix frontend run test:e2e` after Playwright Chromium installation.
   Tests use an isolated simulator data directory and a built UI served by FastAPI.
 
-Existing README "refactor status" describes the earlier milestone only; the three implementation
-notes above supersede its feature-status statements. Physical testing, actual-card OCR accuracy,
-and live Gemini acceptance are not implied by software test success.
+Physical testing, actual-card OCR accuracy and live Gemini acceptance are not implied by software test success.
 
 Frontend development now requires **Node >=22.12.0**. The Phase 3 dependency-maintenance commit
 updates affected tooling/router packages; the verified npm audit reports zero advisories.
 See [dependency notes](docs/implementation/DEPENDENCIES.md).
+
+Stabilization review: [changes, tests and completion gates](docs/implementation/STABILIZATION.md).

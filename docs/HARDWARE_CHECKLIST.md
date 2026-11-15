@@ -2,25 +2,26 @@
 
 Tick items only when actually performed. Do not report unperformed tests as passed.
 
-Proposed XIAO ESP32-S3 pin mapping: [motor wiring reference](ESP32_MOTOR_WIRING.md).
+Confirmed XIAO ESP32-S3 pin assignment: [motor wiring reference](ESP32_MOTOR_WIRING.md).
 Constants are recorded in `firmware/esp32/codeanywhere/hardware_pins.h`; active
-firmware outputs remain disabled pending a separately authorized integration.
+firmware outputs remain disabled by default. Use explicit calibration/run profiles in the
+[Mac hardware runbook](MAC_HARDWARE_SETUP.md); physical acceptance below remains pending.
 
 ## Before wiring (ME-1)
 - [ ] Exact motor model, rated voltage, no-load and **stall** current measured/confirmed
 - [ ] Stall current within DRV8833 limits (≈1.5 A RMS / 2 A peak per channel) — else choose another driver
 - [ ] 4 motors independently controllable (2× DRV8833 = 4 H-bridges)
 - [ ] Battery voltage/capacity chosen; regulator for ESP32 3.3 V/5 V; **common ground**
-- [ ] Motor power never routed through ESP32 pins; GPIO list written into `codeanywhere.ino`
+- [ ] Motor power never routed through ESP32 pins; GPIO list checked against `hardware_pins.h`
 - [ ] Fuse / power switch reachable
 
 ## Firmware bring-up
-- [ ] Each motor spins the correct direction at low duty (fix sign in `setMotor` / wiring)
-- [ ] `MS_PER_CELL` and `MS_PER_90` measured on the real board surface (3 trials each)
+- [ ] Each motor spins the correct direction at low duty (record LF/RF/LR/RR polarity in the private hardware profile)
+- [ ] `msPerCell` and `msPer90` measured on the real board surface (3 trials each), saved and acknowledged
 - [ ] STOP during a move halts within ~100 ms
 - [ ] Laptop disconnect / Wi-Fi off → motors stop within 1 s (watchdog)
 - [ ] Same `msgId` sent twice → second returns DUPLICATE, no motion
-- [ ] Command longer than 8 s is truncated
+- [ ] Command longer than 8 s is rejected before motion
 
 ## Vision
 - [ ] Corner markers 0–3 detected in all lighting conditions with projector ON

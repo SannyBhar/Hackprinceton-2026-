@@ -77,12 +77,15 @@ class Session:
         self.themes = None
         self.camera = None
         self.scan_busy = False
+        self.device_operation = None
         self.session_id = uuid.uuid4().hex
         self._io_tasks: set[asyncio.Task] = set()
         self._writer_lock = asyncio.Lock()
         self.seq = 0
         self.subscribers: set[asyncio.Queue] = set()
         self.robot.on_pose = self.on_pose
+        if hasattr(self.robot,"on_status"):
+            self.robot.on_status = self.changed
 
     # ------------------------------------------------------------------ plumbing
     async def start(self):
@@ -94,6 +97,8 @@ class Session:
     async def close(self):
         await self.robot.stop("application shutdown")
         tasks = self._bg + ([self._run_task] if self._run_task else [])
+        if self.joystick._neutral_task and not self.joystick._neutral_task.done():
+            tasks.append(self.joystick._neutral_task)
         for t in tasks:
             t.cancel()
         await asyncio.gather(*tasks, return_exceptions=True)
@@ -140,7 +145,6 @@ class Session:
 
     def _save_settings(self):
         self.persist(self.storage.put_record, "settings", "session", {
-            "joystick": {"active": self.joystick.active, "error": self.joystick.error},
             "activePuzzleId": self.puzzle.id, "studentId": self.student_id, "projection": self.projection.model_dump(mode="json")})
 
     def changed(self):
@@ -155,6 +159,8 @@ class Session:
         return {
             "studentId": self.student_id,
             "sessionId": self.session_id,
+            "joystick": self.joystick.status(),
+            "deviceOperation": self.device_operation,
             "camera": self.camera.status() if self.camera else None,
             "seq": self.seq,
             "state": self.state.value,
@@ -170,14 +176,28 @@ class Session:
             "tiles": tiles,
             "pose": self.pose.model_dump() if self.pose else None,
             "robot": {"adapter": self.robot.name, "connected": self.robot.connected,
-                      "continuousSupported": getattr(self.robot, "continuous_supported", False)},
+                      "continuousSupported": getattr(self.robot, "continuous_supported", False),
+                      "readiness": getattr(self.robot, "readiness", {"ready": True, "mode": "simulator"})},
             "recording": self.recording,
             "feed": self.feed[-25:],
             "tilePolicy": self.tile_policy,
             "maxSteps": self.max_steps,
         }
 
+    def reserve_device(self, operation):
+        self._require(S.IDLE, S.SCANNING, S.PROGRAM_READY, S.COMPLETED, S.STOPPED, S.FAULT, action=operation)
+        if self.scan_busy:
+            raise ConflictError("scan in progress")
+        self.device_operation = operation
+        self.changed()
+
+    def release_device(self):
+        self.device_operation = None
+        self.changed()
+
     def _require(self, *states: SessionState, action: str):
+        if self.device_operation:
+            raise ConflictError(f"cannot {action}: {self.device_operation} pending")
         if self.state not in states:
             raise ConflictError(f"cannot {action} while {self.state.value}")
 
@@ -316,6 +336,8 @@ class Session:
         if not self.program:
             raise ConflictError("no confirmed program")
         self._check_start_pose()
+        if hasattr(self.robot, 'preflight'):
+            self.robot.preflight(sum(i.op not in ('START','STOP') for i in self.program))
         attempt_id = uuid.uuid4().hex[:10]
         self._clear_feedback()
         self.grader = Grader(attempt_id, self.puzzle.targetEntries)
@@ -364,6 +386,9 @@ class Session:
                     self.log("error", f"robot error on card {i + 1}: {ack.error}")
                     break
                 if ack.status == "STOPPED":
+                    if self._stop_reason is None:
+                        self._stop_reason = StopReason.ROBOT_FAULT
+                        self.log("error", f"device stopped on card {i + 1}: {ack.error or 'unexplained stop'}")
                     break
             await asyncio.sleep(0.4)  # let the final pose settle into the last cell
         except asyncio.CancelledError:
@@ -408,6 +433,9 @@ class Session:
             if reason != StopReason.INSTRUCTOR_STOP:
                 self.log("warn", f"recording halted: {reason.value}")
             await self._end_recording()
+        else:
+            # Calibration/device transitions may hold ownership while session is idle.
+            await self.robot.stop(reason.value)
 
     async def reset(self):
         self._require(S.IDLE, S.SCANNING, S.PROGRAM_READY, S.COMPLETED, S.STOPPED, S.FAULT,
@@ -477,6 +505,8 @@ class Session:
             return
         self._require(S.IDLE, S.PROGRAM_READY, S.COMPLETED, S.STOPPED, action="start recording")
         self._check_start_pose()
+        if hasattr(self.robot, 'preflight'):
+            self.robot.preflight(1)
         self._clear_feedback()
         p = self.pose
         start = (Cell(row=math.floor(p.y), col=math.floor(p.x)) if p and p.trackingValid else self.puzzle.startCell)

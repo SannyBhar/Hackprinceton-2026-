@@ -29,8 +29,8 @@ class LocalHandwritingOcr:
                 text = self._processor.batch_decode(output,skip_special_tokens=True)[0].strip()
                 self.error = None
                 self.last_text = text
-                # Confidence is deliberately conservative, not a calibrated probability.
-                return (int(text), .5) if re.fullmatch('[1-5]',text) else (None,0.)
+                # Sequence output has no calibrated correctness probability.
+                return (int(text), None) if re.fullmatch('[1-5]',text) else (None,None)
         except Exception as e:
             self.error = str(e)
-            return None, 0.
+            return None, None

@@ -10,7 +10,7 @@ import { openProjectionWindow } from '../projection/window';
 const LABELS = ['TL', 'TR', 'BR', 'BL'];
 
 export function SetupTab({ snap }: { snap: Snapshot }) {
-  const { run, error } = useAction();
+  const { run, error, setError } = useAction();
   const [heightCorrection,setHeightCorrection] = useState(0);
   const [step, setStep] = useState(5);
   const cal = snap.calibration;
@@ -19,9 +19,9 @@ export function SetupTab({ snap }: { snap: Snapshot }) {
 
   const setPs = (patch: Partial<typeof ps>) => run(() => api.setProjection({ ...ps, ...patch }));
   const setCorners = (corners: Corner[]) => run(() => api.saveCalibration({ ...cal, corners }));
-  // Slider moves fire fast; skip the busy/error wrapper and let the server state echo back.
-  const sendCorners = (corners: Corner[]) => { api.saveCalibration({ ...cal, corners }).catch(() => {}); };
-  const moving = snap.state === 'RUNNING' || snap.state === 'RECORDING';
+  // Report rejected calibration updates while the server remains authoritative.
+  const sendCorners = (corners: Corner[]) => { api.saveCalibration({ ...cal, corners }).catch(e => setError(e.message)); };
+  const moving = snap.state === 'RUNNING' || snap.state === 'RECORDING' || !!snap.deviceOperation;
   const [tl, tr, br, bl] = cal.corners;
   const keyAmt = 1 - (tr.x - tl.x) / Math.max(1e-6, br.x - bl.x);
   const nudge = (dx: number, dy: number) => {
@@ -114,6 +114,10 @@ export function SetupTab({ snap }: { snap: Snapshot }) {
           </Card>
 
           <Card title="Rover" subtitle={`${snap.robot.adapter} · ${snap.robot.connected ? 'connected' : 'not connected'}`}>
+            <p>{snap.robot.readiness?.ready ? 'Ready to move' : 'Movement blocked'} · {snap.robot.readiness?.mode ?? 'unknown firmware'}
+              {snap.robot.readiness?.remainingCommands != null && ` · ${snap.robot.readiness.remainingCommands}/128 command slots remaining`}</p>
+            {snap.robot.readiness?.error && <p className="warn">{snap.robot.readiness.error}</p>}
+            {!sim && <HardwareCalibration disabled={moving} mode={snap.robot.readiness?.mode} />}
             {sim ? (
               <>
                 <p className="muted small" style={{ margin: 0 }}>Rehearse safety stops with the simulator:</p>
@@ -150,4 +154,26 @@ function CameraPreview() {
     return () => window.clearInterval(timer);
   }, []);
   return image ? <img alt="Shared webcam preview" src={image} style={{ width: '100%' }} /> : null;
+}
+
+function HardwareCalibration({disabled,mode}:{disabled:boolean;mode?:string}) {
+  const [action,setAction]=useState<'wheel'|'translation'|'turn'>('wheel');
+  const [wheel,setWheel]=useState(0);
+  const [duty,setDuty]=useState(20);
+  const [duration,setDuration]=useState(100);
+  const [confirmed,setConfirmed]=useState(false);
+  const {run,error,busy}=useAction();
+  return <fieldset disabled={disabled || busy || mode!=='calibration'}><legend>Instructor calibration (one pulse)</legend>
+    <p>First verify motor rating, supply and wiring in the private hardware profile. Wheels: LF, RF, LR, RR. Measure polarity before translation/turn trials. No automatic repeat.</p>
+    <label>Action <select value={action} onChange={e=>{setAction(e.target.value as typeof action);setConfirmed(false);}}>
+      <option value="wheel">Wheel polarity</option><option value="translation">Translation trial</option><option value="turn">In-place turn trial</option></select></label>
+    <label>Wheel <select value={wheel} onChange={e=>{setWheel(Number(e.target.value));setConfirmed(false);}}>{['LF','RF','LR','RR'].map((w,i)=><option key={w} value={i}>{w}</option>)}</select></label>
+    <label>Signed PWM duty <input type="number" min={-200} max={200} value={duty} onChange={e=>{setDuty(Number(e.target.value));setConfirmed(false);}} /></label>
+    <label>Duration (ms, maximum 250) <input type="number" min={1} max={250} value={duration} onChange={e=>{setDuration(Number(e.target.value));setConfirmed(false);}} /></label>
+    <label><input type="checkbox" checked={confirmed} onChange={e=>setConfirmed(e.target.checked)}/> I cleared the area and explicitly request this single pulse.</label>
+    <button disabled={!confirmed} onClick={()=>{setConfirmed(false);run(async()=>{
+      const ack=await api.hardwareCalibration({action,wheel,duty,durationMs:duration,confirmed:true});
+      if(ack.status==='ERROR')throw new Error(ack.error ?? 'Calibration failed');
+    });}}>Send one pulse</button><ErrorBox error={error}/>
+  </fieldset>;
 }

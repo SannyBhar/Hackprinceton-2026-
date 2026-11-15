@@ -1,8 +1,6 @@
-"""Camera acquisition boundary. No arbitration or scan/track handoff yet.
+"""Scoped capture port used by card detection and the shared CameraCoordinator.
 
-Each consumer owns a scoped capture. A future single-camera coordinator can implement
-CameraSource without changing card detection or pose processing. Frame timestamps
-continue to be assigned by the existing pose processor.
+Role arbitration/revalidation lives in coordinator.py; this adapter only owns acquisition.
 """
 from contextlib import contextmanager
 from typing import Any, ContextManager, Iterator, Literal, Protocol
