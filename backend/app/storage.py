@@ -65,3 +65,26 @@ class Storage:
 
     def save_attempt(self, attempt_id: str, record: dict) -> None:
         self._write(self.dir / "attempts" / f"{attempt_id}.json", record)
+
+    def list_attempts(self):
+        return sorted([json.loads(f.read_text()) for f in (self.dir / "attempts").glob("*.json")], key=lambda r:r.get("startedAt",0))
+
+    def _record_path(self, kind, id):
+        import re
+        from .sqlite_store import KINDS
+        if kind not in KINDS or not re.fullmatch(r"[A-Za-z0-9_-]{1,80}", id):
+            raise ValueError("invalid record identifier")
+        path = self.dir / kind / (id + ".json")
+        path.parent.mkdir(exist_ok=True)
+        return path
+
+    def put_record(self, kind, id, body):
+        self._write(self._record_path(kind,id),body)
+
+    def get_record(self, kind, id):
+        path = self._record_path(kind,id)
+        return json.loads(path.read_text()) if path.exists() else None
+
+    def list_records(self, kind):
+        path = self._record_path(kind,"index").parent
+        return [json.loads(f.read_text()) for f in sorted(path.glob("*.json"))]

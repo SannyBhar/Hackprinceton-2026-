@@ -114,15 +114,46 @@ void handleCmd(uint8_t client, JsonDocument& d) {
   sendAck(client, msgId, "ACCEPTED");
 }
 
+bool continuousActive = false;
+uint32_t driveExpires = 0;
+int driveClient = -1;
+int64_t driveSeq = -1;
+void handleDrive(uint8_t client, JsonDocument& d) {
+  String id = d["msgId"] | "";
+  int ttl = d["ttlMs"] | 0;
+  float linear = d["linear"] | 0.0f, angular = d["angular"] | 0.0f;
+  int64_t seq = d["seq"] | (int64_t)-1;
+  if (!GRASSROOT_WIRING_VERIFIED || d["protocolVersion"] != 2 || ttl < 1 || ttl > 250 ||
+      !isfinite(linear) || !isfinite(angular) || abs(linear)>1 || abs(angular)>1 ||
+      (linear != 0 && angular != 0) || motion.active || (continuousActive && driveClient != client)) {
+    continuousActive=false; motorsOff(); sendAck(client,id,"ERROR","invalid drive or unavailable control"); return;
+  }
+  if (seq <= driveSeq) { sendAck(client,id,"DUPLICATE"); return; }
+  driveSeq=seq; driveClient=client;
+  int left=(int)((linear+angular)*DRIVE_DUTY), right=(int)((linear-angular)*DRIVE_DUTY);
+  drive(left,right); continuousActive=true; driveExpires=millis()+ttl;
+  sendAck(client,id,"DONE");
+}
+
 void onWs(uint8_t client, WStype_t type, uint8_t* payload, size_t len) {
-  if (type == WStype_DISCONNECTED) { finishMotion("STOPPED"); return; }
+  if (type == WStype_CONNECTED) {
+    // Starting a new control connection never resumes movement.
+    finishMotion("STOPPED"); continuousActive=false; driveSeq=-1;
+    ws.sendTXT(client,"{\"type\":\"hello\",\"protocolVersion\":2}"); return;
+  }
+  if (type == WStype_DISCONNECTED) { finishMotion("STOPPED"); continuousActive=false; return; }
   if (type != WStype_TEXT) return;
   JsonDocument d;
-  if (deserializeJson(d, payload, len)) { finishMotion("STOPPED"); return; }
+  if (deserializeJson(d, payload, len)) { finishMotion("STOPPED"); continuousActive=false; return; }
   String t = d["type"] | "";
   if (t == "hb") lastHeartbeat = millis();
-  else if (t == "cmd") { lastHeartbeat = millis(); handleCmd(client, d); }
-  else { finishMotion("STOPPED"); }
+  else if (t == "drive") { lastHeartbeat = millis(); handleDrive(client,d); }
+  else if (t == "cmd") {
+    if (String(d["kind"] | "") == "STOP") continuousActive=false;
+    else if (continuousActive) { sendAck(client,d["msgId"] | "","ERROR","continuous control active"); return; }
+    lastHeartbeat = millis(); handleCmd(client, d);
+  }
+  else { finishMotion("STOPPED"); continuousActive=false; }
 }
 
 void setup() {
@@ -140,6 +171,7 @@ void setup() {
 void loop() {
   ws.loop();
   uint32_t now = millis();
+  if (continuousActive && ((int32_t)(now-driveExpires)>=0 || now-lastHeartbeat>HEARTBEAT_TIMEOUT_MS)) { motorsOff(); continuousActive=false; }
   if (motion.active && (int32_t)(now - motion.endAt) >= 0) finishMotion("DONE");
   if (motion.active && now - lastHeartbeat > HEARTBEAT_TIMEOUT_MS) {
     Serial.println("heartbeat lost -> STOP");

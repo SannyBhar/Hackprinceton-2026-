@@ -250,6 +250,10 @@ async def clear_scan():
     return {"ok": True}
 
 
+from .history_api import router as history_router
+app.include_router(history_router(lambda: session))
+
+
 # Serve the built frontend (npm run build) so one process runs the whole app.
 DIST = ROOT / "frontend" / "dist"
 if DIST.exists():

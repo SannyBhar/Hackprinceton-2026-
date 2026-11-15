@@ -12,6 +12,9 @@ async def running_session(session: Session):
     try:
         await session.start()
         cfg = Settings.from_env()
+        session._bg.append(asyncio.create_task(session.joystick.watchdog()))
+        if cfg.joystick_port:
+            session._bg.append(asyncio.create_task(session.joystick.serial_loop(cfg.joystick_port)))
         if cfg.cards == "opencv" or cfg.tracker == "camera":
             from .vision.coordinator import CameraCoordinator
             session.camera = CameraCoordinator(session, cfg.card_camera, cfg.data_dir)

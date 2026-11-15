@@ -1,5 +1,5 @@
 import type {
-  Cell, Instruction, ProjectionSettings, ProjectorCalibration, Puzzle, PuzzleListItem, ScanResult,
+  Attempt, Recording, Student, Cell, Instruction, ProjectionSettings, ProjectorCalibration, Puzzle, PuzzleListItem, ScanResult,
 } from './types';
 
 async function call<T>(method: string, path: string, body?: unknown): Promise<T> {
@@ -17,6 +17,14 @@ async function call<T>(method: string, path: string, body?: unknown): Promise<T>
 }
 
 export const api = {
+  students: () => call<Student[]>('GET','/api/students'),
+  createStudent: (name:string) => call<Student>('POST','/api/students',{name}),
+  selectStudent: (studentId:string|null) => call('PUT','/api/student',{studentId}),
+  attempts: (studentId?:string) => call<Attempt[]>('GET','/api/attempts'+(studentId?'?studentId='+encodeURIComponent(studentId):'')),
+  recordings: () => call<Recording[]>('GET','/api/recordings'),
+  importRecording: (record:unknown) => call('POST','/api/recordings/import',record),
+  confirmRecording: (id:string,reviewed:boolean) => call('POST',`/api/recordings/${encodeURIComponent(id)}/confirm`,{reviewed}),
+  joystickSample: (sample:{protocolVersion:number;seq:number;timestampMs:number;x:number;y:number;button:boolean}) => call('POST','/api/joystick/sample',sample),
   puzzles: () => call<PuzzleListItem[]>('GET', '/api/puzzles'),
   /** Save AND make it the active puzzle on the board. */
   savePuzzle: (p: Puzzle) => call<Puzzle>('PUT', '/api/puzzle', p),

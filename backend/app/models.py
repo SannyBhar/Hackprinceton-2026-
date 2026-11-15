@@ -125,6 +125,8 @@ class ScannedCard(BaseModel):
     order: int
     cardId: Optional[int]
     op: Optional[Op]
+    ocrText: Optional[str] = None
+    ocrModel: Optional[str] = None
     rawSteps: Optional[int] = None          # OCR candidate, never used directly
     stepsConfidence: Optional[float] = None
     markerConfidence: float = 1.0
