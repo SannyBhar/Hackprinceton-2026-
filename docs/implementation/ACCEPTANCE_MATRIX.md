@@ -5,7 +5,7 @@
 
 # Complete-specification traceability
 
-Source: `docs/Grassroot_Project_Architecture.md` (unchanged). Rows enumerate all specification
+Source: `docs/Greenlite_Project_Architecture.md` (unchanged). Rows enumerate all specification
 headings, bullet requirements and table rows with source line numbers. Subordinate prose is
 covered by its containing section. User decisions supersede provisional source examples:
 XIAO GPIO1/2/3/4/5/6/43/44 with SLP tied to 3V3; joystick X/Y/button GPIO1/2/3 confirmed; turns are in-place;
@@ -27,7 +27,7 @@ re-executes an old ID. A power cycle clears history; the backend never retries a
 | --- | --- | --- | --- | --- |
 | 15 | ## 1. Confirmed decisions and governing principles | All | Session/models/shared Board; phase docs | Software + physical verification pending |
 | 17 | /  Question  /  Final decision  / | All | Session/models/shared Board; phase docs | Software + physical verification pending |
-| 19 | /  Name  /  **Grassroot** everywhere in UI, code docs, project branding  / | All | Session/models/shared Board; phase docs | Software + physical verification pending |
+| 19 | /  Name  /  **Greenlite** everywhere in UI, code docs, project branding  / | All | Session/models/shared Board; phase docs | Software + physical verification pending |
 | 20 | /  Physical distance input  /  **Handwritten integer** written on `FORWARD` / `BACKWARD` cards; OCR + instructor confirmation  / | All | Session/models/shared Board; phase docs | Software + physical verification pending |
 | 21 | /  AI  /  **Generated visual maze themes** and **adaptive learning / challenge selection**; no chatbot  / | All | Session/models/shared Board; phase docs | Software + physical verification pending |
 | 22 | /  Grading  /  **Ordered, index-by-index comparison of observed cell entries to target entries**  / | All | Session/models/shared Board; phase docs | Software + physical verification pending |
@@ -314,7 +314,7 @@ re-executes an old ID. A power cycle clears history; the backend never retries a
 | 447 | 5. Show instructor preview with exact overlays. Accept, regenerate or use prepared fallback. | 1/2/3 | Covered by containing section and phase acceptance scripts | Software paths implemented; corresponding physical/live-provider steps PENDING |
 | 448 | 6. Cache accepted local image with puzzle hash, theme/style, output settings and prompt version; project only when not RUNNING/RECORDING. | 1/2/3 | Covered by containing section and phase acceptance scripts | Software paths implemented; corresponding physical/live-provider steps PENDING |
 | 449 | 7. If generation fails/times out, continue using an existing local theme. Never block Stop or movement safety. | 1/2/3 | Covered by containing section and phase acceptance scripts | Software paths implemented; corresponding physical/live-provider steps PENDING |
-| 573 | 1. **Introduction:** “Kids learn to code with physical cards and a real robot; Grassroot turns programming into a projected interactive maze.” | 1/2/3 | Covered by containing section and phase acceptance scripts | Software paths implemented; corresponding physical/live-provider steps PENDING |
+| 573 | 1. **Introduction:** “Kids learn to code with physical cards and a real robot; Greenlite turns programming into a projected interactive maze.” | 1/2/3 | Covered by containing section and phase acceptance scripts | Software paths implemented; corresponding physical/live-provider steps PENDING |
 | 574 | 2. Instructor selects level/maze; approved AI theme appears behind the authoritative grid and target route. | 1/2/3 | Covered by containing section and phase acceptance scripts | Software paths implemented; corresponding physical/live-provider steps PENDING |
 | 575 | 3. Student lays `START → FORWARD [handwritten 2] → RIGHT → FORWARD [handwritten 1] → STOP` cards. Webcam scans, instructor confirms OCR values. | 1/2/3 | Covered by containing section and phase acceptance scripts | Software paths implemented; corresponding physical/live-provider steps PENDING |
 | 576 | 4. Robot executes while projection displays green/red observed entries; show a deliberately wrong middle step that does not halt the run, and a later correct step. | 1/2/3 | Covered by containing section and phase acceptance scripts | Software paths implemented; corresponding physical/live-provider steps PENDING |

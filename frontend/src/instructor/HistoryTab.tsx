@@ -25,7 +25,7 @@ export function HistoryTab({snap}: {snap:Snapshot}) {
       <input aria-label="Student alias" value={name} maxLength={80} onChange={e=>setName(e.target.value)} placeholder="Local student alias" />
       <button disabled={!name.trim()} onClick={()=>run(async()=>{await api.createStudent(name.trim());setName('');await refresh();})}>Add student</button>
       <button onClick={()=>run(refresh)}>Refresh history</button>
-      <button onClick={()=>download('grassroot-puzzle.json',snap.puzzle)}>Export active puzzle</button>
+      <button onClick={()=>download('greenlite-puzzle.json',snap.puzzle)}>Export active puzzle</button>
       <label>Import puzzle JSON <input type="file" accept="application/json" onChange={e=>{const f=e.target.files?.[0];if(f)run(async()=>{await api.savePuzzleOnly(JSON.parse(await f.text()));await refresh();});}} /></label>
       <label>Import recording JSON <input type="file" accept="application/json" onChange={e=>{const f=e.target.files?.[0];if(f)run(async()=>{await api.importRecording(JSON.parse(await f.text()));await refresh();});}} /></label>
       <ErrorBox error={error} />

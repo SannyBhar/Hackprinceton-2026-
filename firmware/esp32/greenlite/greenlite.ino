@@ -1,4 +1,4 @@
-// Grassroot XIAO ESP32-S3 robot. Disabled by default; measured run profile required.
+// Greenlite XIAO ESP32-S3 robot. Disabled by default; measured run profile required.
 // Legacy AP and source paths are retained for compatibility.
 #include <WiFi.h>
 #include <ArduinoOTA.h>

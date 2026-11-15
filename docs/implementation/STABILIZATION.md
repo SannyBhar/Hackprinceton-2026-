@@ -119,8 +119,8 @@ checklist. This report records stabilization overrides and tests, not a claim of
 - `docs/implementation/PHASE_3.md`
 - `docs/implementation/PYTHON_AUDIT.json`
 - `docs/implementation/STABILIZATION.md`
-- `firmware/esp32/codeanywhere/codeanywhere.ino`
-- `firmware/esp32/codeanywhere/hardware_pins.h`
+- `firmware/esp32/greenlite/greenlite.ino`
+- `firmware/esp32/greenlite/hardware_pins.h`
 - `firmware/esp32/joystick/joystick.ino`
 - `firmware/esp32/network_config.h`
 - `firmware/hardware_profile.py`

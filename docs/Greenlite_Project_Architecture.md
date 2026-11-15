@@ -1,8 +1,8 @@
 > **2026-11-15 card-format update:** Physical cards now use 2-inch ArUco DICT_4X4_1000 IDs 0/1/2/3 for FORWARD/BACKWARD/RIGHT/LEFT, with one cell per translation block and repeated blocks for longer movement. The handwritten-distance/OCR requirements below describe the superseded format. See [current unit-block contracts and printing](UNIT_BLOCKS.md).
 
-# Grassroot — Unified Project Architecture & MVP Specification
+# Greenlite — Unified Project Architecture & MVP Specification
 
-**Project:** Grassroot (formerly CodeAnywhere)  
+**Project:** Greenlite (formerly Grassroot, originally CodeAnywhere)  
 **Track:** Education; optional Physical AI / Practical AI  
 **Timeframe:** 72-hour hackathon  
 **Target learners:** Grades 2–4  
@@ -10,7 +10,7 @@
 **Status:** Consolidated implementation specification; hardware specifications and integrations identified as *unverified* below must be tested.  
 **Core programming scope:** `START`, `FORWARD n`, `BACKWARD n`, `LEFT`, `RIGHT`, `STOP`. **No programming loops, conditionals, functions, sideways movement, or arbitrary-angle turns.** Normal software control flow (e.g., internal error handling) is not excluded.
 
-> **Summary.** Grassroot teaches programming by letting children arrange physical ArUco-tagged coding cards with handwritten movement distances. A laptop webcam scans their code; a four-wheel ESP32-S3 robot executes it on a maze projected onto the floor. In reverse mode, a separate joystick lets children drive the robot continuously, then reconstructs a supported block sequence from the recorded actions and observed path. The instructor web app controls sessions, calibration, maze themes, levels, ordered-path scoring, progress analytics, and adaptive challenge recommendations. The robot does not talk to children or provide conversational instruction.
+> **Summary.** Greenlite teaches programming by letting children arrange physical ArUco-tagged coding cards with handwritten movement distances. A laptop webcam scans their code; a four-wheel ESP32-S3 robot executes it on a maze projected onto the floor. In reverse mode, a separate joystick lets children drive the robot continuously, then reconstructs a supported block sequence from the recorded actions and observed path. The instructor web app controls sessions, calibration, maze themes, levels, ordered-path scoring, progress analytics, and adaptive challenge recommendations. The robot does not talk to children or provide conversational instruction.
 
 ---
 
@@ -18,7 +18,7 @@
 
 | Question | Final decision |
 |---|---|
-| Name | **Grassroot** everywhere in UI, code docs, project branding |
+| Name | **Greenlite** everywhere in UI, code docs, project branding |
 | Physical distance input | **Handwritten integer** written on `FORWARD` / `BACKWARD` cards; OCR + instructor confirmation |
 | AI | **Generated visual maze themes** and **adaptive learning / challenge selection**; no chatbot |
 | Grading | **Ordered, index-by-index comparison of observed cell entries to target entries** |
@@ -357,7 +357,7 @@ During execution, overhead arena view yields time-stamped marker pose. Convert p
 ### 7.3 Suggested repo layout
 
 ```text
-grassroot/
+greenlite/
 ├── frontend/
 │   └── src/
 │       ├── pages/{Dashboard,Setup,PuzzleEditor,Session,Progress}.tsx
@@ -572,7 +572,7 @@ Suggested theme metadata: `requestId`, `puzzleId`, `puzzleVersion`, `puzzleHash`
 
 ## 12. Demo script and success criteria
 
-1. **Introduction:** “Kids learn to code with physical cards and a real robot; Grassroot turns programming into a projected interactive maze.”
+1. **Introduction:** “Kids learn to code with physical cards and a real robot; Greenlite turns programming into a projected interactive maze.”
 2. Instructor selects level/maze; approved AI theme appears behind the authoritative grid and target route.
 3. Student lays `START → FORWARD [handwritten 2] → RIGHT → FORWARD [handwritten 1] → STOP` cards. Webcam scans, instructor confirms OCR values.
 4. Robot executes while projection displays green/red observed entries; show a deliberately wrong middle step that does not halt the run, and a later correct step.

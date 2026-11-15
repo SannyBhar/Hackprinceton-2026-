@@ -1,4 +1,4 @@
-# CodeAnywhere — 72-hour build plan
+# Greenlite — 72-hour build plan
 
 Principle: the simulator runs the **same** tracker → grader → projection pipeline as the real
 hardware. Every hardware piece replaces one adapter; nothing else changes. Integrate early,
@@ -58,7 +58,7 @@ Adjust names as needed.
 
 ### Day 2 (hours 24–48): robot + cards
 
-- **ME-1 + SW-A (hrs 24–36):** fill GPIO in `codeanywhere.ino`, flash, connect laptop to the
+- **ME-1 + SW-A (hrs 24–36):** fill GPIO in `greenlite.ino`, flash, connect laptop to the
   ESP32 AP, `CA_ROBOT=esp32`. Calibrate `MS_PER_CELL` / `MS_PER_90` on the real surface.
   Verify: STOP mid-move, unplug laptop → watchdog stops within 1 s, resend same msgId → no move.
   If open-loop drift is too large, add camera-closed-loop correction between commands (heading

@@ -14,7 +14,7 @@ from app.settings import Settings
 async def main():
     if not os.environ.get('GEMINI_API_KEY'):
         raise SystemExit('BLOCKED: configure GEMINI_API_KEY privately in the process environment')
-    with tempfile.TemporaryDirectory(prefix='grassroot-theme-acceptance-') as directory:
+    with tempfile.TemporaryDirectory(prefix='greenlite-theme-acceptance-') as directory:
         # Isolated simulator session; no camera, serial or physical robot is opened.
         session=build_session(Settings(data_dir=Path(directory),robot='sim',cards='fixture',tracker='sim'))
         service=ThemeJobs(session,Path(directory))

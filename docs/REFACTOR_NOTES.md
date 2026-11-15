@@ -1,4 +1,4 @@
-# Grassroot structural refactor notes
+# Greenlite structural refactor notes
 
 Branch: `refactor/grassroot-structure` (local only). Base: `805411ceb728fe98c64ba6ec597ff817b6f72b73`.
 No push, merge, deployment, credentials change, dependency upgrade or new product feature.
@@ -16,7 +16,7 @@ Existing documentation is retained.
 - RecordingTab.useGamepad → instructor/useGamepad.ts; discrete polling logic unchanged.
 - InstructorApp.openProjectionWindow implementation → projection/window.ts; old export retained.
 - ProgramTab validation fetch → existing api.validate with plannedEntries added to its return type.
-- Display strings and OpenAPI title → Grassroot. Package, popup and firmware identifiers retained.
+- Display strings and OpenAPI title → Greenlite. Package, popup and firmware identifiers retained.
 
 ## Preserved behavior and deliberate limits
 
@@ -103,8 +103,8 @@ advisories and the TestClient deprecation remain unresolved intentionally in thi
 - `backend/tests/test_adapters.py`
 - `backend/tests/test_boundaries.py`
 - `docs/ARCHITECTURE.md`
-- `docs/Grassroot_Codex_Structural_Refactor.md`
-- `docs/Grassroot_Project_Architecture.md`
+- `docs/Greenlite_Codex_Structural_Refactor.md`
+- `docs/Greenlite_Project_Architecture.md`
 - `docs/REFACTOR_NOTES.md`
 - `frontend/index.html`
 - `frontend/src/api/client.test.ts`

@@ -33,7 +33,7 @@ def generate(out):
         if supplied.is_file():shutil.copyfile(supplied,out/name)
         else:(out/name).write_text(svg_marker(mid))
         figures.append(f'<figure><img src="{name}" alt="{op} marker {mid}"><figcaption>{op} · ID {mid}</figcaption></figure>')
-    html='''<!doctype html><html><head><meta charset="utf-8"><title>Grassroot unit blocks</title>
+    html='''<!doctype html><html><head><meta charset="utf-8"><title>Greenlite unit blocks</title>
 <style>@page{size:letter;margin:.5in}body{font:12px sans-serif}main{display:grid;grid-template-columns:2in 2in;gap:.25in .5in}figure{margin:0;width:2in}img{display:block;width:2in;height:2in}figcaption{padding-top:.08in}header{margin-bottom:.25in}</style>
 </head><body><header>Print at 100% / actual size, without fit-to-page. Each marker square is 2 × 2 inches.
 Labels are outside the block. Leave white space around each block when scanning. START/STOP are optional.</header><main>'''+''.join(figures)+'</main></body></html>\n'

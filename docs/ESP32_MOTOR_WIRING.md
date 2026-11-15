@@ -1,4 +1,4 @@
-# Grassroot — confirmed XIAO ESP32-S3 motor pins
+# Greenlite — confirmed XIAO ESP32-S3 motor pins
 
 The team confirmed this pin assignment. Electrical inspection, motor rating, polarity and
 motion calibration remain pending. The disabled default firmware does not energize outputs.

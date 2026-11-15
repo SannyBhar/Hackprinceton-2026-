@@ -36,7 +36,7 @@ async def lifespan(app: FastAPI):
         yield
 
 
-app = FastAPI(title="Grassroot", lifespan=lifespan)
+app = FastAPI(title="Greenlite", lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
 

@@ -1,4 +1,4 @@
-# Grassroot
+# Greenlite
 
 Physical-card coding robot for grades 2–4.
 
@@ -8,8 +8,8 @@ webapp scans them, runs the robot on a physical grid, tracks it with an overhead
 each cell entry against an ordered target route, and projects live feedback onto the board via a
 plain projector.
 
-Architecture specification: [Grassroot](docs/Grassroot_Project_Architecture.md) ·
-Structural refactor: [brief](docs/Grassroot_Codex_Structural_Refactor.md) ·
+Architecture specification: [Greenlite](docs/Greenlite_Project_Architecture.md) ·
+Structural refactor: [brief](docs/Greenlite_Codex_Structural_Refactor.md) ·
 Current architecture: [module map](docs/ARCHITECTURE.md) · [refactor notes and checks](docs/REFACTOR_NOTES.md) ·
 Plan: [docs/BUILD_PLAN.md](docs/BUILD_PLAN.md) ·
 Defaults we chose: [docs/ASSUMPTIONS.md](docs/ASSUMPTIONS.md) · Projector setup: [docs/PROJECTION_SETUP.md](docs/PROJECTION_SETUP.md) ·

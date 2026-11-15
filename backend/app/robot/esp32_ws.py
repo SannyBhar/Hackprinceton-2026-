@@ -1,6 +1,6 @@
 """ESP32 WebSocket transport (UNVERIFIED against hardware).
 
-Wire protocol (JSON text frames), matching firmware/esp32/codeanywhere/codeanywhere.ino:
+Wire protocol (JSON text frames), matching firmware/esp32/greenlite/greenlite.ino:
   laptop -> robot  {"type":"cmd","runId","instrIndex","msgId","kind":"MOVE|TURN|STOP","value"}
   laptop -> robot  {"type":"hb","t":<ms>}                     every 250 ms
   robot  -> laptop {"type":"ack","msgId","status":"ACCEPTED|DONE|STOPPED|DUPLICATE|ERROR","error"?}

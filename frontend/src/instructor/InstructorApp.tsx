@@ -28,7 +28,7 @@ export function InstructorApp() {
   const [tab, setTab] = useState<Tab>('puzzle');
 
   if (!snap) {
-    return <div className="loading">Connecting to the Grassroot backend… (is it running on :8000?)</div>;
+    return <div className="loading">Connecting to the Greenlite backend… (is it running on :8000?)</div>;
   }
   
 
@@ -38,7 +38,7 @@ export function InstructorApp() {
         <div className="brand">
           <div className="brand-mark"><RoverIcon size={30} /></div>
           <div>
-            <h1>Grassroot</h1>
+            <h1>Greenlite</h1>
             <small>{snap.puzzle.name}</small>
           </div>
         </div>

@@ -8,7 +8,7 @@
 #define GRASSROOT_WIFI_STATION 0
 #endif
 #ifndef GRASSROOT_AP_SSID
-#define GRASSROOT_AP_SSID "codeanywhere-robot"
+#define GRASSROOT_AP_SSID "greenlite-robot"
 #endif
 #ifndef GRASSROOT_AP_PASS
 #define GRASSROOT_AP_PASS "change-me-please"

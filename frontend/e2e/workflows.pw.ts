@@ -2,7 +2,7 @@ import { test,expect } from '@playwright/test';
 
 test('UI, scan review, global STOP and projection stay synchronized',async({page,context})=>{
   await page.goto('/');
-  await expect(page.getByRole('heading',{name:'Grassroot',exact:true})).toBeVisible();
+  await expect(page.getByRole('heading',{name:'Greenlite',exact:true})).toBeVisible();
   await expect(page.getByRole('button',{name:'■ STOP',exact:true})).toBeVisible();
   await page.getByRole('button',{name:/Program$/}).click();
   await page.getByRole('button',{name:'📷 Scan cards'}).click();

@@ -1,9 +1,9 @@
-# Grassroot — Codex Structural Refactor Brief
+# Greenlite — Codex Structural Refactor Brief
 
-**Companion specification:** `Grassroot_Project_Architecture.md` (authoritative product requirements)  
+**Companion specification:** `Greenlite_Project_Architecture.md` (authoritative product requirements)  
 **Existing repository:** https://github.com/SannyBhar/Hackprinceton-2026-  
-**Task type:** **Structural refactor only**. This is **not** a request to implement Grassroot's missing features.  
-**Project name:** Grassroot (formerly CodeAnywhere)
+**Task type:** **Structural refactor only**. This is **not** a request to implement Greenlite's missing features.  
+**Project name:** Greenlite (formerly Grassroot, originally CodeAnywhere)
 
 ## 0. Instructions to Codex (read first)
 
@@ -25,7 +25,7 @@ The accompanying product specification fixes the eventual design:
 
 | Area | Confirmed final requirement |
 |---|---|
-| Identity | Grassroot |
+| Identity | Greenlite |
 | Commands | `START`, `FORWARD n`, `BACKWARD n`, `LEFT`, `RIGHT`, `STOP` only |
 | Card distance | Handwritten integers, OCR with mandatory instructor review when uncertain |
 | Camera | **One** shared generic USB webcam for scanning and arena tracking |
@@ -48,7 +48,7 @@ Before modifying code:
    - `backend/app/robot/`: base protocol, simulator, ESP32 transport.
    - `backend/app/vision/`: card readers and camera tracker.
    - `frontend/src/`: API, shared board renderer, calibration, projection, instructor screens.
-   - `firmware/esp32/codeanywhere/`: Arduino firmware.
+   - `firmware/esp32/greenlite/`: Arduino firmware.
    - `fixtures/`, `tools/`, `docs/`.
    Treat these as **reported paths**; verify before moving or renaming anything.
 3. Map imports and call sites, especially for the session class, REST/WebSocket handlers, simulator, grading reducer, recording, projector rendering, and robot transport.
@@ -212,7 +212,7 @@ Use existing model types if already equivalent. Prefer Pydantic/dataclasses/Type
 ## 8. Configuration, naming, and dependency hygiene
 
 1. Prefer a single typed/configured backend settings entry point and a documented example environment file. Keep old `CA_*` variables accepted as aliases temporarily if they already work; document replacements under `GRASSROOT_*` without breaking teammates' setups.
-2. Use **Grassroot** for display name, README, main docs and current application identifiers. Don't change network endpoints, package names, database paths, build tools, microcontroller IDs, or imports solely for branding unless fully validated.
+2. Use **Greenlite** for display name, README, main docs and current application identifiers. Don't change network endpoints, package names, database paths, build tools, microcontroller IDs, or imports solely for branding unless fully validated.
 3. Preserve existing Python and frontend dependency management; pin or lock versions only when compatible with current toolchain. No unnecessary frameworks, event brokers, ORMs, or new services.
 4. Keep secrets out of the repo. Any future image-generation provider key is backend-only; this phase does not need one.
 5. Centralize logging and error labels where practical. Errors should distinguish incorrect code, bad scan, stale camera observation, hardware command failure, boundary stop and transport loss.
@@ -283,7 +283,7 @@ Add small unit tests at interfaces or extracted pure modules **only where those 
 
 ### Phase E — Frontend separation and naming
 - Consolidate typed API/state consumption and shared board renderer as needed.
-- Rename user-visible project branding to Grassroot and update documentation.
+- Rename user-visible project branding to Greenlite and update documentation.
 - Avoid UI redesign and unintended behavior changes.
 - Run frontend tests and build.
 
@@ -297,8 +297,8 @@ Add small unit tests at interfaces or extracted pure modules **only where those 
 Codex should return:
 
 1. **Refactored existing source tree** (not a brand-new app), with no broken imports.
-2. **Updated `README.md`** explaining how to run the simulator and tests and identifying Grassroot by name.
-3. **`docs/ARCHITECTURE.md`** with a concise module responsibility map, dependency direction and extension points; link the companion Grassroot specification.
+2. **Updated `README.md`** explaining how to run the simulator and tests and identifying Greenlite by name.
+3. **`docs/ARCHITECTURE.md`** with a concise module responsibility map, dependency direction and extension points; link the companion Greenlite specification.
 4. **`docs/REFACTOR_NOTES.md`** listing old → new paths, preserved behavior, design tradeoffs, unresolved hardware dependencies and any intentional compatibility aliases.
 5. **Test report** with exact commands and results, plus warnings for any tests not run.
 6. **Short next-phase TODO list** (handwriting OCR, one-camera handoff, continuous joystick reconstruction, SQLite migration, AI themes, adaptive learning, ESP32-S3 electrical/firmware validation) clearly marked **NOT IMPLEMENTED** unless already genuinely present.
@@ -313,7 +313,7 @@ Codex should return:
 - Core domain logic is insulated from framework/hardware concerns; hardware/storage/vision interfaces have clean ownership.
 - No duplicate state managers or circular imports were introduced.
 - There is no fake or hardcoded AI/OCR/SQLite implementation disguised as completed work.
-- All user-visible project branding reads **Grassroot**, while necessary legacy internal compatibility is maintained.
+- All user-visible project branding reads **Greenlite**, while necessary legacy internal compatibility is maintained.
 - The refactor has not added unsupported child-programming commands.
 
 **Stop and report instead of guessing if:** the current repo differs substantially from the README; uncommitted teammate work would be overwritten; hardware dependencies cannot be verified; a critical baseline test fails; or a proposed extraction would require changing established grading/projection semantics.
@@ -322,4 +322,4 @@ Codex should return:
 
 ## 14. Copy/paste task for Codex
 
-> In the current repository, read `Grassroot_Project_Architecture.md` and `Grassroot_Codex_Structural_Refactor.md`. Execute **only the structural refactor** described in the refactor brief. First inspect the actual code and establish baseline tests. Keep working implementations, simulator, endpoints, grading, and projection behavior unchanged. Introduce clean ownership boundaries, typed contracts, adapter interfaces, and focused module separation where justified, without gratuitous scaffolding. Update branding to Grassroot while preserving compatibility. Do not implement handwriting OCR, continuous reverse coding, SQLite, AI generation, adaptive learning, new firmware behavior, or additional block-language features yet. Work incrementally, run tests after each phase, and report files changed, test results, compatibility risks, and explicit unimplemented next-phase items. Do not push changes without permission.
+> In the current repository, read `Greenlite_Project_Architecture.md` and `Greenlite_Codex_Structural_Refactor.md`. Execute **only the structural refactor** described in the refactor brief. First inspect the actual code and establish baseline tests. Keep working implementations, simulator, endpoints, grading, and projection behavior unchanged. Introduce clean ownership boundaries, typed contracts, adapter interfaces, and focused module separation where justified, without gratuitous scaffolding. Update branding to Greenlite while preserving compatibility. Do not implement handwriting OCR, continuous reverse coding, SQLite, AI generation, adaptive learning, new firmware behavior, or additional block-language features yet. Work incrementally, run tests after each phase, and report files changed, test results, compatibility risks, and explicit unimplemented next-phase items. Do not push changes without permission.

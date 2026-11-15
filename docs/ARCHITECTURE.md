@@ -1,7 +1,7 @@
-# Grassroot — current architecture
+# Greenlite — current architecture
 
-See the [full product specification](Grassroot_Project_Architecture.md) and
-[structural brief](Grassroot_Codex_Structural_Refactor.md). Implementation and acceptance status are tracked separately in
+See the [full product specification](Greenlite_Project_Architecture.md) and
+[structural brief](Greenlite_Codex_Structural_Refactor.md). Implementation and acceptance status are tracked separately in
 [the requirements matrix](implementation/ACCEPTANCE_MATRIX.md); software existence does not imply physical acceptance.
 
 | Module | Responsibility |
@@ -48,7 +48,7 @@ The frontend displays authoritative backend tiles and shares one board renderer.
 
 Public module paths, main.build_session import, InstructorApp.openProjectionWindow export,
 REST routes, WS snapshot/pose messages and sequence policy, JSON paths, fixture IDs,
-robot primitives and additive acknowledgments and Arduino sketch location are retained. Display branding is Grassroot;
+robot primitives and additive acknowledgments and Arduino sketch location are retained. Display branding is Greenlite;
 legacy package name, popup window name and firmware network identifiers remain unchanged.
 No camera or firmware hardware validation is claimed.
 

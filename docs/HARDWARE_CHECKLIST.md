@@ -3,7 +3,7 @@
 Tick items only when actually performed. Do not report unperformed tests as passed.
 
 Confirmed XIAO ESP32-S3 pin assignment: [motor wiring reference](ESP32_MOTOR_WIRING.md).
-Constants are recorded in `firmware/esp32/codeanywhere/hardware_pins.h`; active
+Constants are recorded in `firmware/esp32/greenlite/hardware_pins.h`; active
 firmware outputs remain disabled by default. Use explicit calibration/run profiles in the
 [Mac hardware runbook](MAC_HARDWARE_SETUP.md); physical acceptance below remains pending.
 
