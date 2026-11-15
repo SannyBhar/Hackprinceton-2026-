@@ -16,7 +16,7 @@ npm --prefix frontend run build
 ./scripts/run-local.sh
 ```
 
-Optional `ocr` installs real local TrOCR and `ai` installs image validation dependencies.
+Physical cards now use [unit blocks](UNIT_BLOCKS.md) with no OCR dependency. Optional `ai` installs image validation dependencies.
 For development use `./dev.sh` after exporting settings; for the built UI use the local runner
 and open http://127.0.0.1:8000. The runner loads your own ignored root `.env` shell assignments.
 Keep credentials out of Vite variables, screenshots, logs, commits and PRs.
@@ -30,7 +30,7 @@ GRASSROOT_CARDS=opencv
 GRASSROOT_TRACKER=camera
 GRASSROOT_CAMERA=0
 GRASSROOT_JOYSTICK_PORT=/dev/cu.usbmodem_YOUR_JOYSTICK
-# Optional later: GRASSROOT_OCR=local, GEMINI_API_KEY (private value only)
+# Optional later: GEMINI_API_KEY (private value only)
 ```
 
 Use `ls /dev/cu.usb*` to identify each board. macOS Camera permission must be granted to the
@@ -136,7 +136,7 @@ reconnect alone does not reset the ledger. Calibration pulses consume slots too.
 - [ ] Joystick → raw recording → reviewed approximate reconstruction → validated replay → history.
 - [ ] Physical STOP during program/continuous/calibration, neutral, second button, disconnect,
       heartbeat/expiry, tracking loss and boundary stops; reconnect never replays motion.
-- [ ] Projector alignment, dark marker regions, camera placement/parallax and real-card OCR benchmark.
+- [ ] Projector alignment, dark marker regions, camera placement/parallax and physical unit-block recognition.
 
 Live Nano Banana acceptance is deliberately deferred until the robot works without themes.
 Static themes, simulation, fixture scans, synthetic histories and offline cached artwork remain available.

@@ -135,6 +135,7 @@ class ScannedCard(BaseModel):
 
 
 class ScanResult(BaseModel):
+    unitBlocks: bool = False  # physical v2 cards: every translation is exactly one cell
     scanId: str
     source: str
     cards: list[ScannedCard]

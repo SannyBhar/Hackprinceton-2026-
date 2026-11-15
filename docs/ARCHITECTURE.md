@@ -15,7 +15,7 @@ See the [full product specification](Grassroot_Project_Architecture.md) and
 | `storage.py` | Existing JSON implementation, legacy imports and representation |
 | `robot/base.py`, `robot/simulator.py`, `robot/esp32_ws.py` | Existing motion protocol and adapters; firmware communication unchanged |
 | `vision/camera.py` | Scoped, injectable capture ownership for card scanning |
-| `vision/cards.py` | Fixture/card recognition; existing OCR callable typed as OcrPort |
+| `vision/cards.py` | Fixture/unit-block recognition; DICT_4X4_1000 IDs 0–3, no distance recognition |
 | `vision/board_camera.py` | Markerless overhead tracking: test-pattern calibration, robot detection, pose stream |
 | `frontend/src/api/` | Shared session types, HTTP client and sequenced WS subscription |
 | `frontend/src/board/`, `calibration/` | Shared board composition and projection math |
@@ -33,7 +33,7 @@ The frontend displays authoritative backend tiles and shares one board renderer.
 - `vision/coordinator.py` owns the webcam for card scanning and preview. Robot tracking is `vision/board_camera.py`;
   the API refuses to open either while the other holds the webcam.
   Session reserves conflicting device operations synchronously before asynchronous transitions.
-- `vision/ocr.py` is optional local TrOCR; scores are explicitly uncalibrated and review is mandatory.
+- `vision/markers.py` owns the physical unit-block registry; `vision/cards.py` reads repeated marker instances in spatial order. `vision/ocr.py` is retained for historical tooling, outside the active physical-card workflow.
 - `joystick.py` acquires synchronized USB protocol-v2 samples independently of drive acknowledgments.
   Only latest axes are retained for control; a bounded button-edge queue preserves toggles.
 - `hardware.py` validates one private measured profile. Firmware publishes readiness/profile identity
@@ -54,3 +54,5 @@ No camera or firmware hardware validation is claimed.
 
 
 See [the stabilization report](implementation/STABILIZATION.md) for additive contracts and pending hardware gates.
+
+Current card-format override: [two-inch unit movement blocks](UNIT_BLOCKS.md). Saved numeric programs retain compatible internal counts; the student UI uses repeated one-cell blocks.

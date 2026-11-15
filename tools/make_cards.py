@@ -1,54 +1,51 @@
-"""Generate printable ArUco corner markers, robot marker, and coding cards.
+"""Generate 2-inch unit-block SVGs and a print-at-actual-size HTML sheet.
 
-    pip install -r backend/requirements-vision.txt
-    python tools/make_cards.py --out printables
+    backend/.venv/bin/python tools/make_cards.py --out printables
 
-Card layout (matches OpenCvCardRecognizer): marker square on the left (unit 1),
-gap 0.25, handwriting box 1.5 wide on the right for FORWARD/BACKWARD.
+No handwritten-distance boxes or arena markers are generated. Keep white gaps between blocks.
 """
 import argparse
 from pathlib import Path
+import shutil
+import sys
 
-import cv2
-import numpy as np
-
-DICT = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_100)
-CARDS = [("START", range(10, 14)), ("FORWARD", range(20, 32)), ("BACKWARD", range(40, 48)),
-         ("LEFT", range(60, 66)), ("RIGHT", range(70, 76)), ("STOP", range(80, 84))]
-ARROWS = {"FORWARD": "^", "BACKWARD": "v", "LEFT": "<-", "RIGHT": "->", "START": ">", "STOP": "[]"}
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / 'backend'))
+from app.vision.markers import BLOCK_INCHES, CARD_OPS, DICTIONARY_NAME
 
 
-def marker(mid: int, px: int) -> np.ndarray:
-    return cv2.aruco.generateImageMarker(DICT, mid, px)
+def svg_marker(mid):
+    import cv2
+    pixels=cv2.aruco.generateImageMarker(cv2.aruco.getPredefinedDictionary(getattr(cv2.aruco,DICTIONARY_NAME)),mid,6)
+    cells=''.join(f'<rect x="{x}" y="{y}" width="1" height="1" fill="white"/>'
+                  for y in range(6) for x in range(6) if pixels[y,x])
+    return (f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 6 6" width="{BLOCK_INCHES}in" '
+            f'height="{BLOCK_INCHES}in" shape-rendering="crispEdges">'
+            '<rect width="6" height="6" fill="black"/>'+cells+'</svg>\n')
 
 
-def card(op: str, mid: int, unit: int = 300) -> np.ndarray:
-    w, h = int(unit * 3.0), int(unit * 1.6)
-    img = np.full((h, w), 255, np.uint8)
-    m0 = int(unit * 0.15)
-    img[m0:m0 + unit, m0:m0 + unit] = marker(mid, unit)
-    if op in ("FORWARD", "BACKWARD"):
-        x0 = m0 + int(unit * 1.25)
-        cv2.rectangle(img, (x0, m0), (x0 + int(unit * 1.5), m0 + unit), 0, 6)
-    cv2.putText(img, f"{op} {ARROWS[op]}", (m0, h - int(unit * 0.12)), cv2.FONT_HERSHEY_SIMPLEX, 1.6, 0, 4)
-    cv2.rectangle(img, (0, 0), (w - 1, h - 1), 160, 2)
-    return img
+def generate(out):
+    out.mkdir(parents=True,exist_ok=True)
+    figures=[]
+    for mid,op in CARD_OPS.items():
+        name=f'card_{op}_{mid}.svg'
+        supplied=ROOT/'assets'/'markers'/f'4x4_1000-{mid}.svg'
+        if supplied.is_file():shutil.copyfile(supplied,out/name)
+        else:(out/name).write_text(svg_marker(mid))
+        figures.append(f'<figure><img src="{name}" alt="{op} marker {mid}"><figcaption>{op} · ID {mid}</figcaption></figure>')
+    html='''<!doctype html><html><head><meta charset="utf-8"><title>Grassroot unit blocks</title>
+<style>@page{size:letter;margin:.5in}body{font:12px sans-serif}main{display:grid;grid-template-columns:2in 2in;gap:.25in .5in}figure{margin:0;width:2in}img{display:block;width:2in;height:2in}figcaption{padding-top:.08in}header{margin-bottom:.25in}</style>
+</head><body><header>Print at 100% / actual size, without fit-to-page. Each marker square is 2 × 2 inches.
+Labels are outside the block. Leave white space around each block when scanning. START/STOP are optional.</header><main>'''+''.join(figures)+'</main></body></html>\n'
+    (out/'unit-blocks.html').write_text(html)
+    return out/'unit-blocks.html'
 
 
 def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--out", default="printables")
-    a = ap.parse_args()
-    out = Path(a.out)
-    out.mkdir(exist_ok=True)
-    for mid, name in [(0, "TL"), (1, "TR"), (2, "BR"), (3, "BL"), (4, "ROBOT")]:
-        img = cv2.copyMakeBorder(marker(mid, 600), 60, 60, 60, 60, cv2.BORDER_CONSTANT, value=255)
-        cv2.imwrite(str(out / f"marker_{mid}_{name}.png"), img)
-    for op, ids in CARDS:
-        for mid in ids:
-            cv2.imwrite(str(out / f"card_{op}_{mid}.png"), card(op, mid))
-    print(f"wrote markers and cards to {out}/")
+    parser=argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--out',type=Path,default=Path('printables'))
+    args=parser.parse_args()
+    print(f'Wrote 2-inch SVGs and print sheet: {generate(args.out)}')
 
 
-if __name__ == "__main__":
-    main()
+if __name__=='__main__':main()

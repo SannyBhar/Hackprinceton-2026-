@@ -322,6 +322,9 @@ class Session:
                 raise InvalidError("review the current scan and confirm its scanId")
             if not self.scan.cards or self.scan.errors:
                 raise InvalidError("scan is invalid; rescan or explicitly clear it for manual programming")
+        if self.scan is not None and self.scan.unitBlocks:
+            if any(i.op in ("FORWARD", "BACKWARD") and i.steps != 1 for i in program):
+                raise InvalidError("each scanned movement block must move exactly one cell; use repeated blocks")
         result = plan(self.puzzle, program, self.max_steps)
         if not result.ok:
             raise InvalidError("; ".join(result.errors))

@@ -67,3 +67,23 @@ test('readiness and live joystick status are visible; serial errors do not disap
   await expect(page.getByText('Joystick input compatibility error')).toBeVisible();
   await expect(page.getByRole('button',{name:'■ STOP',exact:true})).toBeVisible();
 });
+
+test('unit marker scans retain repeats, require review and have no distance entry',async({page})=>{
+  await page.goto('/');
+  await page.getByRole('button',{name:/Program$/}).click();
+  await page.getByRole('button',{name:'📷 Scan cards'}).click();
+  const snap=await(await page.request.get('/api/state')).json();
+  expect(snap.scan.unitBlocks).toBe(true);
+  await expect(page.locator('table.review input[type="number"]')).toHaveCount(0);
+  await expect(page.getByRole('button',{name:'Confirm program',exact:true})).toBeDisabled();
+  const physicalMoves=snap.scan.cards.filter((c:{op:string})=>c.op==='FORWARD'||c.op==='BACKWARD');
+  expect(physicalMoves.length).toBeGreaterThan(1);
+  const denied=await page.request.post('/api/program/confirm',{data:{scanId:snap.scan.scanId,reviewed:true,instructions:[{op:'START'},{op:'FORWARD',steps:2},{op:'STOP'}]}});
+  expect(denied.status()).toBe(400);
+  await page.getByRole('button',{name:'I checked every block and its order'}).click();
+  await page.getByRole('button',{name:'Confirm program',exact:true}).click();
+  await expect.poll(async()=> (await(await page.request.get('/api/state')).json()).state).toBe('PROGRAM_READY');
+  const ready=await(await page.request.get('/api/state')).json();
+  expect(ready.program.filter((i:{op:string})=>i.op==='FORWARD'||i.op==='BACKWARD').every((i:{steps:number})=>i.steps===1)).toBe(true);
+  expect(ready.program.length).toBe(snap.scan.cards.length);
+});

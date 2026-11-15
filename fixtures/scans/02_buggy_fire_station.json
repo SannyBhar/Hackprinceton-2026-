@@ -1,10 +1,72 @@
-{"note": "Bug: turns one row too late, then recovers onto the route (shows red then green).",
- "cards": [
-  {"order": 0, "cardId": 11, "op": "START"},
-  {"order": 1, "cardId": 23, "op": "FORWARD", "rawSteps": 3, "stepsConfidence": 0.93},
-  {"order": 2, "cardId": 71, "op": "RIGHT"},
-  {"order": 3, "cardId": 24, "op": "FORWARD", "rawSteps": 3, "stepsConfidence": 0.91},
-  {"order": 4, "cardId": 61, "op": "LEFT"},
-  {"order": 5, "cardId": 25, "op": "FORWARD", "rawSteps": null, "stepsConfidence": null},
-  {"order": 6, "cardId": 81, "op": "STOP"}
- ]}
+{
+  "note": "Unit blocks: one translation cell per repeated physical marker; instructor reviews order.",
+  "cards": [
+    {
+      "order": 0,
+      "cardId": 10,
+      "op": "START",
+      "rawSteps": null
+    },
+    {
+      "order": 1,
+      "cardId": 0,
+      "op": "FORWARD",
+      "rawSteps": 1
+    },
+    {
+      "order": 2,
+      "cardId": 0,
+      "op": "FORWARD",
+      "rawSteps": 1
+    },
+    {
+      "order": 3,
+      "cardId": 0,
+      "op": "FORWARD",
+      "rawSteps": 1
+    },
+    {
+      "order": 4,
+      "cardId": 2,
+      "op": "RIGHT",
+      "rawSteps": null
+    },
+    {
+      "order": 5,
+      "cardId": 0,
+      "op": "FORWARD",
+      "rawSteps": 1
+    },
+    {
+      "order": 6,
+      "cardId": 0,
+      "op": "FORWARD",
+      "rawSteps": 1
+    },
+    {
+      "order": 7,
+      "cardId": 0,
+      "op": "FORWARD",
+      "rawSteps": 1
+    },
+    {
+      "order": 8,
+      "cardId": 3,
+      "op": "LEFT",
+      "rawSteps": null
+    },
+    {
+      "order": 9,
+      "cardId": 0,
+      "op": "FORWARD",
+      "rawSteps": 1
+    },
+    {
+      "order": 10,
+      "cardId": 80,
+      "op": "STOP",
+      "rawSteps": null
+    }
+  ],
+  "unitBlocks": true
+}
