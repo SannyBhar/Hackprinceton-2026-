@@ -48,3 +48,14 @@ REST routes, WS snapshot/pose messages and sequence policy, JSON paths, fixture 
 robot primitives/acks and Arduino sketch location are retained. Display branding is Grassroot;
 legacy package name, popup window name and firmware network identifiers remain unchanged.
 No camera or firmware hardware validation is claimed.
+
+
+## Full implementation additions
+
+The implementation notes under `docs/implementation/` supersede the earlier extension-only
+status above. CameraCoordinator owns role/calibration/preview; Session owns the control lease;
+ContinuousRecorder owns timestamped input/trajectory reconstruction; SQLiteStorage implements
+persistence with JSON compatibility; ThemeJobs owns bounded Gemini requests and caches;
+learning.py is a pure BKT/candidate module. history_api/intelligence_api are focused routers.
+Frontend History and Themes & Progress reuse the existing shared types, client and Board.
+The six-command block language, ordered grader and projector geometry remain authoritative.

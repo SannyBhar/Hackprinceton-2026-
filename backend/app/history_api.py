@@ -5,11 +5,16 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 from .models import Instruction
 from .joystick import JoystickSample
+from .errors import ConflictError
 
 
 class StudentBody(BaseModel):
     name: str = Field(min_length=1,max_length=80)
     synthetic: bool = False
+
+
+class RecordingOptions(BaseModel):
+    grade: bool = False
 
 
 class SelectionBody(BaseModel):
@@ -45,7 +50,7 @@ def router(get_session):
 
     @api.put('/student')
     async def select_student(body:SelectionBody):
-        from .session import ConflictError,InvalidError
+        from .errors import ConflictError,InvalidError
         try: get_session().select_student(body.studentId)
         except (ConflictError,InvalidError) as e: raise HTTPException(409,str(e))
         return {'ok':True}
@@ -73,11 +78,18 @@ def router(get_session):
         if not body.reviewed: raise HTTPException(400,'review the approximate recording before replay')
         record=await asyncio.to_thread(s.storage.get_record,'recordings',id)
         if not record: raise HTTPException(404,'recording not found')
-        from .session import ConflictError,InvalidError
+        from .errors import ConflictError,InvalidError
         try:
             s.scan=None
             s.confirm_program([Instruction.model_validate(i) for i in record['generated']])
         except (ConflictError,InvalidError,ValueError) as e: raise HTTPException(400,str(e))
+        return {'ok':True}
+
+    @api.put('/recording/options')
+    async def options(body:RecordingOptions):
+        s=get_session()
+        if s.state.value in ('RUNNING','RECORDING'):raise HTTPException(409,'stop before changing recording options')
+        s.recording_grade=body.grade
         return {'ok':True}
 
     @api.post('/joystick/sample')
@@ -85,7 +97,7 @@ def router(get_session):
         s=get_session()
         if s.robot.name!='simulator': raise HTTPException(409,'real joystick input is accepted only through configured USB serial')
         try: await s.joystick.sample(body,source='browser-simulator')
-        except ValueError as e: raise HTTPException(409,str(e))
+        except (ValueError,ConflictError) as e: raise HTTPException(409,str(e))
         return {'ok':True}
 
     return api

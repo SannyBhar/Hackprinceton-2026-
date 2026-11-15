@@ -107,3 +107,41 @@ Additional verification: `npm --prefix frontend run typecheck` and
 `npm --prefix frontend run build`. No lint script or backend static type checker is configured.
 The baseline npm install reported **8 vulnerabilities (2 moderate, 4 high, 2 critical)**.
 Dependency upgrades are deferred; package manifests and lockfiles were not changed.
+
+## Full implementation: three review phases
+
+See [Phase 1](docs/implementation/PHASE_1.md), [Phase 2](docs/implementation/PHASE_2.md),
+[Phase 3](docs/implementation/PHASE_3.md), and the [requirements/acceptance matrix](docs/implementation/ACCEPTANCE_MATRIX.md).
+These notes distinguish implemented software from still-pending physical acceptance.
+
+- **Storage:** SQLite is the default under the existing data directory. JSON import is
+  idempotent and preserves sources; see `sqlite_import_report.json`. `GRASSROOT_STORAGE=json`
+  retains the old adapter. Back up the whole data directory before migration.
+- **Hardware core:** install `backend/requirements-vision.txt`. Set `GRASSROOT_ROBOT=esp32`,
+  `GRASSROOT_CARDS=opencv`, `GRASSROOT_TRACKER=camera`, `GRASSROOT_CARD_CAMERA=0`. The one
+  webcam is handed between Scan and Arena roles in Setup. Revalidate calibration after moving
+  it; show all corner markers plus the robot marker. STOP is always visible.
+- **OCR:** optional `backend/requirements-ocr.txt`, `GRASSROOT_OCR=local`, writable `HF_HOME`.
+  Cache weights while online. Uncertain/unavailable recognition falls back to instructor input.
+- **Joystick:** optional `backend/requirements-joystick.txt`, `GRASSROOT_JOYSTICK_PORT`.
+  The second board uses USB serial. Its wiring is still unassigned pending the team's commit.
+- **Artwork:** install `backend/requirements-ai.txt`; configure backend `GEMINI_API_KEY` and
+  optionally `GRASSROOT_THEME_MODEL`. Never put a key in Vite settings. Themes & Progress
+  provides preview/accept/cancel/static fallback. Pre-cache before joining the robot AP if
+  that Wi-Fi connection has no internet.
+- **History/progress:** use local aliases in History; inspect/export attempts and approximate
+  recordings. Review warnings before loading generated programs. Recommendations never run
+  the robot; an instructor explicitly approves the next puzzle.
+- **Firmware:** `pip install platformio==6.1.18`, then `pio run -d firmware`; upload a verified
+  target with `pio run -d firmware -e robot -t upload` via USB-C. Both robot and joystick build
+  targets default to disabled/unassigned pins. Do not enable or flash unverified hardware.
+- **Browser tests:** `npm --prefix frontend run test:e2e` after Playwright Chromium installation.
+  Tests use an isolated simulator data directory and a built UI served by FastAPI.
+
+Existing README "refactor status" describes the earlier milestone only; the three implementation
+notes above supersede its feature-status statements. Physical testing, actual-card OCR accuracy,
+and live Gemini acceptance are not implied by software test success.
+
+Frontend development now requires **Node >=22.12.0**. The Phase 3 dependency-maintenance commit
+updates affected tooling/router packages; the verified npm audit reports zero advisories.
+See [dependency notes](docs/implementation/DEPENDENCIES.md).

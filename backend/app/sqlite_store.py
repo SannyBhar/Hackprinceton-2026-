@@ -7,7 +7,7 @@ from .storage import Storage
 from .models import Puzzle, ProjectorCalibration
 from .settings import FIXTURES
 
-KINDS = {'students', 'recordings', 'calibrations', 'theme_assets', 'skill_estimates', 'settings'}
+from .repository import RECORD_KINDS as KINDS
 
 
 class SQLiteStorage(Storage):
@@ -82,11 +82,18 @@ class SQLiteStorage(Storage):
         return [{**p.model_dump(mode='json'), 'builtin':self.is_builtin(p.id), 'edited':p.id in edited} for p in self.list_puzzles()]
 
     def save_puzzle(self, p):
-        body = p.model_dump_json()
         with self.connect() as db:
+            db.execute('BEGIN IMMEDIATE')
+            row = db.execute('SELECT body FROM puzzles WHERE id=?',(p.id,)).fetchone()
+            existing = Puzzle.model_validate_json(row[0]) if row else next(
+                (Puzzle.model_validate_json(f.read_text()) for f in sorted((FIXTURES/'puzzles').glob('*.json'))
+                 if Puzzle.model_validate_json(f.read_text()).id == p.id),None)
+            if existing and existing != p and p.version <= existing.version:
+                p = p.model_copy(update={'version':existing.version+1})
+            body = p.model_dump_json()
             db.execute('INSERT OR REPLACE INTO puzzles VALUES(?,?)', (p.id,body))
-            # Preserve historical versions rather than overwriting their geometry.
             db.execute('INSERT OR IGNORE INTO puzzle_versions VALUES(?,?,?)', (p.id,p.version,body))
+        return p
 
     def delete_puzzle(self, puzzle_id):
         with self.connect() as db:

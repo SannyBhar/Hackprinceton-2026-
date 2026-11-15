@@ -133,6 +133,7 @@ export function ProjectionView() {
           tiles={snap.tiles}
           pose={snap.pose}
           theme={ps.theme}
+          artworkUrl={ps.artworkId ? `/api/themes/${ps.artworkId}/image` : null}
           showGrid={cal.showGrid || ps.calibrating}
           showIndices={false}
           showRobot={false} // the real rover sits on the board; never project one

@@ -18,10 +18,13 @@ class CameraCoordinator:
         self.resolution = None
         self.timestamp = 0
         self._task = None
+        self._capture_context = None
         self._cap = None
         self._tracker = None
         self._mapping = None
         self._lock = threading.Lock()
+        self._role_lock = asyncio.Lock()
+        self._process_lock = threading.Lock()
 
     def invalidate(self):
         self.generation += 1
@@ -35,7 +38,7 @@ class CameraCoordinator:
                     timestampMs=self.timestamp, index=self.index)
 
     def ready(self):
-        return self.role == 'track' and self.calibrated and not self.error and 0 <= int(time.time()*1000)-self.timestamp < 800
+        return self.role == 'track' and self.calibrated and not self.error and self.session.pose is not None and self.session.pose.trackingValid and 0 <= int(time.time()*1000)-self.timestamp < 800
 
     def image(self):
         if self.jpeg is None or int(time.time()*1000)-self.timestamp > 800:
@@ -45,8 +48,9 @@ class CameraCoordinator:
     def _release(self):
         with self._lock:
             if self._cap:
-                self._cap.release()
+                self._capture_context.__exit__(None,None,None)
                 self._cap = None
+                self._capture_context = None
 
     async def close(self):
         if self._task:
@@ -58,6 +62,10 @@ class CameraCoordinator:
         self.invalidate()
 
     async def switch(self, role):
+        async with self._role_lock:
+            await self._switch(role)
+
+    async def _switch(self, role):
         await self.close()
         self.role, self.error = role, None
         self.frame, self.jpeg, self.resolution = None, None, None
@@ -69,7 +77,9 @@ class CameraCoordinator:
         import cv2
         with self._lock:
             if self._cap is None:
-                self._cap = cv2.VideoCapture(self.index)
+                from .camera import OpenCvCameraSource
+                self._capture_context = OpenCvCameraSource().open(self.index,self.role)
+                self._cap = self._capture_context.__enter__()
             ok, frame = self._cap.read()
             if not ok:
                 raise RuntimeError('webcam read failed')
@@ -77,6 +87,12 @@ class CameraCoordinator:
             if not ok:
                 raise RuntimeError('camera image encoding failed')
             return frame, jpg.tobytes(), [int(frame.shape[1]), int(frame.shape[0])]
+
+    def _process(self, frame):
+        with self._process_lock:
+            self._tracker.H = None
+            pose = self._tracker.process(frame)
+            return pose, self._tracker.H.copy() if self._tracker.H is not None else None
 
     async def _run(self):
         from .camera_tracker import CameraTracker
@@ -92,15 +108,14 @@ class CameraCoordinator:
                 if self.role == 'track':
                     self._tracker.rows, self._tracker.cols = self.session.puzzle.rows, self.session.puzzle.cols
                     # No stale mapping may conceal occluded/moved corner markers.
-                    self._tracker.H = None
-                    pose = await asyncio.to_thread(self._tracker.process, frame)
-                    if self.calibrated and self._tracker.H is not None:
+                    pose, mapping = await asyncio.to_thread(self._process, frame)
+                    if self.calibrated and mapping is not None:
                         import numpy as np
                         import cv2
                         pts = np.array([[[0, 0], [self._tracker.cols, 0],
                                          [self._tracker.cols, self._tracker.rows], [0, self._tracker.rows]]], np.float32)
                         before = cv2.perspectiveTransform(pts, np.linalg.inv(self._mapping))
-                        after = cv2.perspectiveTransform(pts, np.linalg.inv(self._tracker.H))
+                        after = cv2.perspectiveTransform(pts, np.linalg.inv(mapping))
                         if np.max(np.linalg.norm(before-after, axis=2)) > 8:
                             self.invalidate()
                             self.error = 'camera or corner markers moved; revalidate calibration'
@@ -119,20 +134,26 @@ class CameraCoordinator:
             self.session.changed()
 
     async def calibrate(self):
+        async with self._role_lock:
+            return await self._calibrate()
+
+    async def _calibrate(self):
         if self.role != 'track' or self._tracker is None or self.frame is None:
             raise ValueError('select arena tracking and wait for camera frames')
         # Freeze this generation; role changes cannot validate an earlier image.
+        if int(time.time()*1000)-self.timestamp > 800:
+            raise ValueError('camera frame is stale')
+        self.invalidate()
         generation = self.generation
-        self._tracker.H = None
-        pose = await asyncio.to_thread(self._tracker.process, self.frame.copy())
-        if generation != self.generation or self._tracker.H is None or not pose.trackingValid:
+        pose, mapping = await asyncio.to_thread(self._process, self.frame.copy())
+        if generation != self.generation or mapping is None or not pose.trackingValid:
             raise ValueError('all four corner markers and robot marker must be visible')
-        self._mapping = self._tracker.H.copy()
+        self._mapping = mapping
         self.calibrated = True
         self.error = None
         record = dict(index=self.index, resolution=self.resolution, generation=self.generation,
                       rows=self.session.puzzle.rows, cols=self.session.puzzle.cols,
-                      homography=self._mapping.tolist(), validatedAt=int(time.time()*1000))
+                      homography=self._mapping.tolist(), heightCorrection=self._tracker.height_correction, validatedAt=int(time.time()*1000))
         await asyncio.to_thread(self._save, record)
         self.session.on_pose(pose)
         self.session.changed()

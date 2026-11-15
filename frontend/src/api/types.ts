@@ -43,6 +43,7 @@ export type ProjectorCalibration = {
   corners: Corner[]; viewportWidth: number; viewportHeight: number; markerMask: number; showGrid: boolean;
 };
 export type ProjectionSettings = {
+  artworkId?: string | null; artworkHash?: string | null;
   calibrating: boolean; testPattern: boolean; activeCorner: number; theme: string; showRobot: boolean;
 };
 
@@ -51,6 +52,7 @@ export type AttemptSummary = {
   reachedGoal: boolean; success: boolean; details: string[];
 };
 export type Attempt = {
+  source?: string;
   id: string; startedAt: number; endedAt?: number; puzzleId: string; puzzleVersion: number;
   program: Instruction[]; instructionIndex: number; events: VisitEvent[]; warnings: string[];
   stopReason: string | null; summary: AttemptSummary | null;
@@ -96,3 +98,8 @@ export type WsMessage =
 
 export const cellKey = (c: Cell) => `${c.row},${c.col}`;
 export const sameCell = (a: Cell, b: Cell) => a.row === b.row && a.col === b.col;
+
+export type ThemeJob = {id:string;status:string;themeText:string;error:string|null;url?:string;accepted:boolean;puzzleHash:string};
+export type SkillEstimate = {skill:string;estimate:number;evidenceCount:number;uncertain:boolean};
+export type ProgressReport = {studentId:string;synthetic:boolean;skills:SkillEstimate[];trend:{attemptId:string;startedAt:number;correct:number;entries:number}[];excludedOperationalOrUnattributed:number;limitations:string};
+export type Recommendation = {puzzle:Puzzle;skill:string;explanation:string;uncertain:boolean};

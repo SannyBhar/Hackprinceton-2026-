@@ -51,7 +51,7 @@ export function RecordingTab({ snap }: { snap: Snapshot }) {
           <Card title="Drive to write code"
                 subtitle="A student drives with the joystick; the app writes the matching cards. It shows the route they drove — not necessarily the only solution.">
             <label className="check"><input type="checkbox" checked={grade} disabled={recording}
-              onChange={(e) => setGrade(e.target.checked)} /> Also grade against this puzzle's route</label>
+              onChange={(e) => {setGrade(e.target.checked);run(() => api.setRecordingGrade(e.target.checked));}} /> Also grade against this puzzle's route</label>
             <div className="row">
               <button className={recording ? 'stop big' : 'go big'} onClick={() => run(() => api.toggleRecording(grade, 'ui'))}>
                 {recording ? '■ Stop recording' : '● Start recording'}
@@ -84,7 +84,7 @@ export function RecordingTab({ snap }: { snap: Snapshot }) {
               <Blocks program={rec.generated} />
               <div className="row">
                 <button onClick={exportJson}>⇩ Export JSON</button>
-                <button className="primary" onClick={() => run(() => api.confirm(rec.generated!))}>Load as program</button>
+                <button className="primary" disabled={!rec.id} onClick={() => {if(window.confirm('I reviewed the generated code and warnings. Load without running?')) run(() => api.confirmRecording(rec.id!,true));}}>Load as program</button>
               </div>
             </Card>
           )}
@@ -92,7 +92,7 @@ export function RecordingTab({ snap }: { snap: Snapshot }) {
       }
       right={
         <BoardCard title={snap.puzzle.name} extra={recording ? <span className="state state-RECORDING">● REC</span> : undefined}>
-          <Board puzzle={snap.puzzle} tiles={snap.tiles} pose={snap.pose} theme={snap.projection.theme}
+          <Board puzzle={snap.puzzle} tiles={snap.tiles} pose={snap.pose} theme={snap.projection.theme} artworkUrl={snap.projection.artworkId ? `/api/themes/${snap.projection.artworkId}/image` : null}
                  highlight={rec.path} width="100%" height="auto" />
         </BoardCard>
       }

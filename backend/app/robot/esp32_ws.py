@@ -123,8 +123,14 @@ class Esp32WebSocketRobot:
 
     async def stop(self, reason: str) -> None:
         if self._ws:
-            await self._ws.send(json.dumps({"type": "cmd", "runId": "-", "instrIndex": -1,
-                                            "msgId": f"stop-{time.time_ns()}", "kind": "STOP", "value": 0}))
+            try:
+                await self._ws.send(json.dumps({"type": "cmd", "runId": "-", "instrIndex": -1,
+                                                "msgId": f"stop-{time.time_ns()}", "kind": "STOP", "value": 0}))
+            except Exception:
+                # Do not block session cleanup on a dead link. Firmware watchdog/drive
+                # expiry is the independent motor stop; disconnected status stays visible.
+                self._ws = None
+                self.continuous_supported = False
 
     def place(self, row: int, col: int, heading_deg: float) -> None:
         pass  # physical robot is placed by hand

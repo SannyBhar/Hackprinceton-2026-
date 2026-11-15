@@ -32,8 +32,9 @@ export function HistoryTab({snap}: {snap:Snapshot}) {
     </Card>
     <Card title="Attempts">
       {attempts.length===0 && <p>No saved attempts for this selection.</p>}
-      {attempts.slice().reverse().map(a=><div className="row" key={a.id}><span>{new Date(a.startedAt).toLocaleString()} · {a.stopReason??'in progress'} · {a.summary?.correct??0} correct</span><button onClick={()=>setDetails(a)}>Details</button><button onClick={()=>download(`attempt-${a.id}.json`,a)}>Export</button></div>)}
-      {details && <><Blocks program={details.program}/><pre style={{whiteSpace:'pre-wrap'}}>{JSON.stringify(details,null,2)}</pre></>}
+      {attempts.slice().reverse().map(a=><div className="row" key={a.id}><span>{new Date(a.startedAt).toLocaleString()} · {a.source??'legacy'} · {a.stopReason??'in progress'} · {a.summary?.correct??0} correct</span><button onClick={()=>setDetails(a)}>Details</button><button onClick={()=>download(`attempt-${a.id}.json`,a)}>Export</button></div>)}
+      {details && <><Blocks program={details.program}/>
+        {details.stopReason==='PROGRAM_COMPLETE' && <div><p>Instructor-observed skill evidence (do not attribute hardware faults to the learner):</p>{['direction','distance','sequencing','spatial'].map(skill=><span key={skill}>{skill} <button onClick={()=>run(()=>api.annotateSkill(details.id,skill,true))}>Observed correct</button><button onClick={()=>run(()=>api.annotateSkill(details.id,skill,false))}>Observed incorrect</button></span>)}</div>}<pre style={{whiteSpace:'pre-wrap'}}>{JSON.stringify(details,null,2)}</pre></>}
     </Card>
     <Card title="Recordings" subtitle="Continuous reconstructions are approximate. Review the code and warnings before loading; loading does not move the robot.">
       {recordings.map((r,i)=><div key={r.id??i}><p>{r.id} · {r.approximate?'Approximate continuous':'Discrete recording'}</p>{r.generated&&<Blocks program={r.generated}/>} {r.warnings.map((w,j)=><p className="warn" key={j}>{w}</p>)}

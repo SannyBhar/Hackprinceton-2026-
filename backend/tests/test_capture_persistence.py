@@ -87,3 +87,15 @@ async def test_synthetic_camera_calibration_and_role_generation(tmp_path):
     record=await camera.calibrate()
     assert camera.ready() and record['resolution']==[560,560]
     camera.invalidate();assert not camera.ready() and s.pose is None
+
+
+def test_library_edits_allocate_distinct_immutable_versions(tmp_path):
+    store=SQLiteStorage(tmp_path)
+    original=store.list_puzzles()[0]
+    one=store.save_puzzle(original.model_copy(update={'name':'first edit'}))
+    two=store.save_puzzle(original.model_copy(update={'name':'second edit'}))
+    assert two.version>one.version>original.version
+    assert store.save_puzzle(two).version==two.version
+    with store.connect() as db:
+        first=db.execute('SELECT body FROM puzzle_versions WHERE id=? AND version=?',(one.id,one.version)).fetchone()[0]
+    assert json.loads(first)['name']=='first edit'

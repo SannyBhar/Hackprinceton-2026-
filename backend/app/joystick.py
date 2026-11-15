@@ -94,7 +94,7 @@ class ContinuousRecorder:
                 return
             if not getattr(self.session.robot,'continuous_supported',False):
                 raise ValueError('robot firmware lacks continuous-drive protocol v2')
-            await self.session.toggle_recording(source='ui')
+            await self.session.toggle_recording(grade=self.session.recording_grade,source='ui')
             self.active = True
             self.raw, self.commands, self.segments = [],[],[]
             self.session.recording['mode'] = 'continuous'
@@ -125,6 +125,9 @@ class ContinuousRecorder:
         await self.session._end_recording()
         record.update(result)
         record['stopReason'] = reason
+        if record.get('summary') and reason not in ('button stop','instructor recording stop'):
+            record['summary']['success'] = False
+            record['summary']['details'].append('Recording ended by an operational stop')
         self.session.persist(self.session.storage.put_record,'recordings',record['id'],record)
         self.session.changed()
 

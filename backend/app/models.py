@@ -169,5 +169,12 @@ class ProjectionSettings(BaseModel):
     calibrating: bool = False
     testPattern: bool = False
     activeCorner: int = 0
+    artworkId: Optional[str] = None
+    artworkHash: Optional[str] = None
     theme: str = "glossy"          # prepared fallback theme id (AI artwork is a later milestone)
     showRobot: bool = True         # draw the tracked robot glyph on the projection
+
+
+def puzzle_hash(puzzle: Puzzle) -> str:
+    import hashlib
+    return hashlib.sha256(puzzle.model_dump_json().encode()).hexdigest()

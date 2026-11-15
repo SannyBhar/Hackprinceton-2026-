@@ -95,6 +95,7 @@ class AttemptSummary:
     reachedGoal: bool
     success: bool
     details: list[str] = field(default_factory=list)
+    pathExactlyCorrect: bool = False
 
 
 def summarize(target: list[Cell], events: list[VisitEvent], goal: Cell,
@@ -118,4 +119,4 @@ def summarize(target: list[Cell], events: list[VisitEvent], goal: Cell,
     if not finished_normally:
         details.append("run ended by an operational stop, not program completion")
     return AttemptSummary(len(events), correct, len(events) - correct, missing, extra,
-                          reached_goal, success, details)
+                          reached_goal, success, details, len(events)==len(target) and correct==len(target))
