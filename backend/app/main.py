@@ -59,10 +59,7 @@ def get_state():
 
 @app.get("/api/puzzles")
 def list_puzzles():
-    st = session.storage
-    return [{**p.model_dump(mode="json"), "builtin": st.is_builtin(p.id),
-             "edited": (st.dir / "puzzles" / f"{p.id}.json").exists()}
-            for p in st.list_puzzles()]
+    return session.storage.list_library()
 
 
 @app.post("/api/puzzles")
@@ -97,24 +94,26 @@ async def put_calibration(c: ProjectorCalibration):
 
 
 @app.put("/api/projection")
-def put_projection(ps: ProjectionSettings):
-    session.set_projection(ps)
+async def put_projection(ps: ProjectionSettings):
+    await guard(session.set_projection, ps)
     return {"ok": True}
 
 
 @app.post("/api/scan")
 async def scan(image: Optional[UploadFile] = File(None)):
     data = await image.read() if image else None
-    return (await guard(session.do_scan, data)).model_dump(mode="json")
+    return (await guard(session.scan_async, data)).model_dump(mode="json")
 
 
 class ProgramBody(BaseModel):
     instructions: list[Instruction]
+    scanId: str | None = None
+    reviewed: bool = False
 
 
 @app.post("/api/program/confirm")
 async def confirm(body: ProgramBody):
-    r = await guard(session.confirm_program, body.instructions)
+    r = await guard(session.confirm_program, body.instructions, body.scanId, body.reviewed)
     return {"ok": True, "plannedEntries": [c.model_dump() for c in r.plannedEntries]}
 
 
@@ -201,6 +200,54 @@ async def ws(websocket: WebSocket):
         pass
     finally:
         session.subscribers.discard(q)
+
+
+class CameraRoleBody(BaseModel):
+    role: Literal["scan", "track", "closed"]
+
+
+@app.post("/api/camera/role")
+async def camera_role(body: CameraRoleBody):
+    if session.state.value in ("RUNNING", "RECORDING"):
+        raise HTTPException(409, "stop before switching camera")
+    if session.scan_busy:
+        raise HTTPException(409, "scan in progress")
+    if session.camera is None:
+        raise HTTPException(400, "camera mode is not configured")
+    await session.camera.switch(body.role)
+    return session.camera.status()
+
+
+@app.post("/api/calibration/camera")
+async def camera_calibration():
+    if session.state.value in ("RUNNING", "RECORDING"):
+        raise HTTPException(409, "stop motors before calibration")
+    if session.camera is None:
+        raise HTTPException(400, "camera mode is not configured")
+    try:
+        return await session.camera.calibrate()
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+@app.get("/api/camera/image")
+def camera_image():
+    from fastapi.responses import Response
+    if session.camera is None:
+        raise HTTPException(400, "camera mode is not configured")
+    try:
+        return Response(session.camera.image(), media_type="image/jpeg", headers={"Cache-Control": "no-store"})
+    except ValueError as e:
+        raise HTTPException(503, str(e))
+
+
+@app.delete("/api/scan")
+async def clear_scan():
+    if session.state.value in ("RUNNING", "RECORDING") or session.scan_busy:
+        raise HTTPException(409, "stop before clearing scan")
+    session.scan = None
+    session.changed()
+    return {"ok": True}
 
 
 # Serve the built frontend (npm run build) so one process runs the whole app.

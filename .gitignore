@@ -6,3 +6,8 @@ __pycache__/
 data/
 printables/
 .DS_Store
+
+work/
+firmware/.pio/
+playwright-report/
+test-results/

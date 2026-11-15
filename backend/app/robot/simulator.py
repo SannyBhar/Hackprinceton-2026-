@@ -81,6 +81,8 @@ class SimulatedRobot:
         if not self.link_up:
             return Ack(p.msgId, "ERROR", "link down")
         async with self._lock:
+            if p.msgId in self._done:
+                return Ack(p.msgId, "DUPLICATE")
             self._stop.clear()
             status = "DONE"
             if p.kind == "MOVE":

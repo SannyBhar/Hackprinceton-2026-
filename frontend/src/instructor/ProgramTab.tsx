@@ -22,7 +22,7 @@ export function ProgramTab({ snap, onRun }: { snap: Snapshot; onRun: () => void 
     if (!snap.scan) return;
     setRows(snap.scan.cards.map((c) => ({
       op: c.op, cardId: c.cardId, rawSteps: c.rawSteps, confidence: c.stepsConfidence, crop: c.cropDataUrl,
-      steps: c.rawSteps, issues: c.issues, reviewed: c.issues.length === 0,
+      steps: c.rawSteps, issues: c.issues, reviewed: c.issues.length === 0 && !needsNumber(c.op),
     })));
   }, [snap.scan?.scanId]);
 
@@ -56,8 +56,9 @@ export function ProgramTab({ snap, onRun }: { snap: Snapshot; onRun: () => void 
     <TwoCol
       left={
         <>
-          <Card step="1" title="Scan the cards" subtitle="Cards are read only when you press Scan — never continuously.">
+          <Card step="1" title="Scan the cards" subtitle="For physical scans, select Scan camera first; review every numeric value.">
             <div className="row">
+              <button disabled={!canEdit || busy} onClick={() => run(() => api.clearScan())}>Manual program / clear scan</button>
               <button className="primary" disabled={!canEdit || busy} onClick={() => run(() => api.scan())}>📷 Scan cards</button>
               {snap.scan && <span className="muted small">Scan {snap.scan.scanId} · {snap.scan.source}</span>}
             </div>
@@ -111,7 +112,7 @@ export function ProgramTab({ snap, onRun }: { snap: Snapshot; onRun: () => void 
 
           <Card step="3" title="Confirm & run" subtitle="Confirming freezes the program — moving cards afterwards has no effect.">
             <div className="row">
-              <button className="primary" disabled={!canConfirm || busy} onClick={() => run(() => api.confirm(program))}>
+              <button className="primary" disabled={!canConfirm || busy} onClick={() => run(() => api.confirm(program, snap.scan?.scanId, true))}>
                 Confirm program
               </button>
               <button className="go" disabled={snap.state !== 'PROGRAM_READY' || busy}
