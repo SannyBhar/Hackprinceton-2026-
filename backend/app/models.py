@@ -47,7 +47,7 @@ class Instruction(BaseModel):
 
 
 class Puzzle(BaseModel):
-    id: str
+    id: str = Field(pattern=r"^[A-Za-z0-9_-]{1,80}$")  # also a filename: no paths
     version: int = 1
     name: str
     rows: int = Field(ge=2, le=20)
@@ -157,5 +157,5 @@ class ProjectionSettings(BaseModel):
     calibrating: bool = False
     testPattern: bool = False
     activeCorner: int = 0
-    theme: str = "city"          # prepared fallback theme id (AI artwork is a later milestone)
+    theme: str = "glossy"          # prepared fallback theme id (AI artwork is a later milestone)
     showRobot: bool = True         # draw the tracked robot glyph on the projection

@@ -56,6 +56,24 @@ export function ProjectionView() {
     setDrag(null);
   }, [cal, vp]);
 
+  // The fullscreen projection window IS the projector output: adopt its size so the
+  // laptop calibration pad has the right aspect. Corners are fractions, so they keep
+  // pointing at the same spots on the projector raster. Non-fullscreen previews never write.
+  const [isFull, setIsFull] = useState(!!document.fullscreenElement);
+  useEffect(() => {
+    const on = () => setIsFull(!!document.fullscreenElement);
+    document.addEventListener('fullscreenchange', on);
+    return () => document.removeEventListener('fullscreenchange', on);
+  }, []);
+  useEffect(() => {
+    if (!cal || !isFull) return;
+    if (cal.viewportWidth === vp.w && cal.viewportHeight === vp.h) return;
+    const t = window.setTimeout(() => {
+      api.saveCalibration({ ...cal, viewportWidth: vp.w, viewportHeight: vp.h }).catch(() => {});
+    }, 400); // wait for the fullscreen resize to settle
+    return () => window.clearTimeout(t);
+  }, [isFull, vp.w, vp.h, cal?.viewportWidth, cal?.viewportHeight]);
+
   // Keyboard: F fullscreen, C calibrate, T test pattern, 1-4 corner, arrows nudge (shift = 10px).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -117,7 +135,7 @@ export function ProjectionView() {
           theme={ps.theme}
           showGrid={cal.showGrid || ps.calibrating}
           showIndices={false}
-          showRobot={ps.showRobot && snap.robot.adapter === 'simulator'}
+          showRobot={false} // the real rover sits on the board; never project one
           markerMask={cal.markerMask}
           testPattern={ps.testPattern}
           width={W}

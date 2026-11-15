@@ -33,6 +33,18 @@ class Storage:
                 out[p.id] = p
         return list(out.values())
 
+    def is_builtin(self, puzzle_id: str) -> bool:
+        return any(Puzzle.model_validate_json(f.read_text()).id == puzzle_id
+                   for f in (FIXTURES / "puzzles").glob("*.json"))
+
+    def delete_puzzle(self, puzzle_id: str) -> str:
+        """Remove a user puzzle. For a bundled example this only reverts local edits."""
+        f = self.dir / "puzzles" / f"{puzzle_id}.json"
+        if not f.exists():
+            return "missing"
+        f.unlink()
+        return "reverted" if self.is_builtin(puzzle_id) else "deleted"
+
     def save_puzzle(self, p: Puzzle) -> None:
         self._write(self.dir / "puzzles" / f"{p.id}.json", p.model_dump(mode="json"))
 

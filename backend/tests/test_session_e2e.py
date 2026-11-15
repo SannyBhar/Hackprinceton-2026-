@@ -19,6 +19,8 @@ async def session(tmp_path):
     robot = SimulatedRobot(speed_cells_s=8, turn_deg_s=900, tick_s=0.01, noise=0.005)
     s = Session(robot, FixtureCardRecognizer(FIXTURES / "scans"), Storage(tmp_path))
     await s.start()
+    # tests are written against the 5x6 fire-station example, not the default starter puzzle
+    s.set_puzzle(next(p for p in s.storage.list_puzzles() if p.id == "fire-station"))
     await asyncio.sleep(0.15)
     yield s
     await s.close()

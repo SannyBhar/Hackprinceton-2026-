@@ -113,6 +113,15 @@ def test_backward_uses_heading():
     assert r.plannedEntries == [C(3, 0), C(4, 0)]
 
 
+def test_bundled_puzzles_valid_and_starter_first():
+    from app.storage import Storage
+    import tempfile, pathlib
+    ps = Storage(pathlib.Path(tempfile.mkdtemp())).list_puzzles()
+    assert ps[0].id == "starter-7x7" and (ps[0].rows, ps[0].cols) == (7, 7)
+    for p in ps:  # every bundled route must be drivable by its own reference plan
+        assert plan(p, [Instruction(op="START"), Instruction(op="STOP")]).ok
+
+
 def test_puzzle_rejects_non_adjacent_route():
     with pytest.raises(ValueError):
         Puzzle(id="x", name="x", rows=3, cols=3, startCell=C(0, 0), startHeading="E",

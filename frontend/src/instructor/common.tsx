@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import type { Cell, Instruction, Snapshot } from '../api/types';
+import { FEEDBACK } from '../board/Board';
 
 export function useAction() {
   const [error, setError] = useState<string | null>(null);
@@ -25,6 +26,48 @@ export function TwoCol({ left, right }: { left: ReactNode; right: ReactNode }) {
   );
 }
 
+export function Card({ title, subtitle, step, actions, children }: {
+  title: ReactNode; subtitle?: ReactNode; step?: ReactNode; actions?: ReactNode; children?: ReactNode;
+}) {
+  return (
+    <div className="card">
+      <div className="card-head">
+        {step != null && <span className="step">{step}</span>}
+        <div style={{ flex: 1 }}>
+          <h2>{title}</h2>
+          {subtitle && <p>{subtitle}</p>}
+        </div>
+        {actions}
+      </div>
+      <div className="card-body">{children}</div>
+    </div>
+  );
+}
+
+export function BoardCard({ title, extra, children, footer }: {
+  title: ReactNode; extra?: ReactNode; children: ReactNode; footer?: ReactNode;
+}) {
+  return (
+    <div className="board-card">
+      <div className="board-head"><h2>{title}</h2><span className="spacer" />{extra}</div>
+      <div className="board-frame">{children}</div>
+      {footer}
+    </div>
+  );
+}
+
+export function FeedbackLegend() {
+  return (
+    <div className="legend">
+      <span><i style={{ background: FEEDBACK.correct }} />✓ correct cell</span>
+      <span><i style={{ background: FEEDBACK.incorrect }} />✗ wrong cell</span>
+      <span><i style={{ background: `linear-gradient(135deg, ${FEEDBACK.correct} 50%, ${FEEDBACK.incorrect} 50%)` }} />
+        revisit: first ◤ / latest ◢</span>
+      <span><i style={{ background: '#3f6fb5', borderRadius: 99 }} />route order</span>
+    </div>
+  );
+}
+
 export const fmtCell = (c: Cell | null | undefined) => (c ? `(${c.row},${c.col})` : '—');
 
 export const OP_ICON: Record<string, string> = {
@@ -46,11 +89,12 @@ export function Blocks({ program, active }: { program: Instruction[]; active?: n
 }
 
 export function Feed({ snap }: { snap: Snapshot }) {
+  if (!snap.feed.length) return <p className="muted small">No events yet.</p>;
   return (
     <div className="feed">
       {[...snap.feed].reverse().map((f, i) => (
         <div key={i} className={`feed-${f.level}`}>
-          <span className="t">{new Date(f.t).toLocaleTimeString()}</span> {f.msg}
+          <span className="t">{new Date(f.t).toLocaleTimeString()}</span>{f.msg}
         </div>
       ))}
     </div>

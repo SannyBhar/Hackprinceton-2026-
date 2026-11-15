@@ -1,5 +1,5 @@
 import type {
-  Instruction, ProjectionSettings, ProjectorCalibration, Puzzle, ScanResult,
+  Instruction, ProjectionSettings, ProjectorCalibration, Puzzle, PuzzleListItem, ScanResult,
 } from './types';
 
 async function call<T>(method: string, path: string, body?: unknown): Promise<T> {
@@ -17,8 +17,12 @@ async function call<T>(method: string, path: string, body?: unknown): Promise<T>
 }
 
 export const api = {
-  puzzles: () => call<Puzzle[]>('GET', '/api/puzzles'),
+  puzzles: () => call<PuzzleListItem[]>('GET', '/api/puzzles'),
+  /** Save AND make it the active puzzle on the board. */
   savePuzzle: (p: Puzzle) => call<Puzzle>('PUT', '/api/puzzle', p),
+  /** Save to the library only (not allowed for the active puzzle). */
+  savePuzzleOnly: (p: Puzzle) => call<Puzzle>('POST', '/api/puzzles', p),
+  deletePuzzle: (id: string) => call<{ result: 'deleted' | 'reverted' }>('DELETE', `/api/puzzles/${encodeURIComponent(id)}`),
   saveCalibration: (c: ProjectorCalibration) => call('PUT', '/api/calibration/projector', c),
   setProjection: (p: ProjectionSettings) => call('PUT', '/api/projection', p),
   scan: () => call<ScanResult>('POST', '/api/scan'),

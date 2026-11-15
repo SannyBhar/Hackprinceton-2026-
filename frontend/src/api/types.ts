@@ -12,6 +12,8 @@ export type Puzzle = {
   sceneryCells: Cell[];
 };
 
+export type PuzzleListItem = Puzzle & { builtin: boolean; edited: boolean };
+
 export type RobotPose = {
   timestampMs: number; x: number; y: number; headingDeg: number; trackingValid: boolean;
 };

@@ -1,10 +1,15 @@
+import { useId, useRef, useState } from 'react';
 import type { Cell, Puzzle, RobotPose, TileState } from '../api/types';
 import { cellKey, sameCell } from '../api/types';
-import { THEMES } from './themes';
+import { Rover } from './Rover';
+import { DEFAULT_THEME, THEMES } from './themes';
 
 export const CELL = 100; // canonical board pixels per cell (projection warps this whole layer)
+const GAP = 4;           // gap between tiles = visible grid line
 
-export const FEEDBACK = { correct: '#16a34a', incorrect: '#dc2626' };
+export const FEEDBACK = { correct: '#24a159', incorrect: '#dc4a3d' };
+
+export type PaintPhase = 'start' | 'move' | 'end';
 
 type Props = {
   puzzle: Puzzle;
@@ -15,10 +20,12 @@ type Props = {
   showGrid?: boolean;
   showIndices?: boolean;
   showRobot?: boolean;
+  roverAtStart?: boolean;     // draw the rover parked on the start cell when there's no live pose
   markerMask?: number;        // fraction of a cell kept black at each corner (projection)
   testPattern?: boolean;
-  highlight?: Cell[];         // editor: cells to outline
+  highlight?: Cell[];         // cells to outline (editor cursor, recorded path)
   onCellClick?: (c: Cell) => void;
+  onPaint?: (c: Cell, phase: PaintPhase) => void; // click-and-drag editing (mouse + touch)
   width?: number | string;
   height?: number | string;
   className?: string;
@@ -31,82 +38,145 @@ export function Board(p: Props) {
   const { puzzle } = p;
   const W = puzzle.cols * CELL;
   const H = puzzle.rows * CELL;
-  const theme = THEMES[p.theme ?? 'city'] ?? THEMES.city;
+  const theme = THEMES[p.theme ?? DEFAULT_THEME] ?? THEMES[DEFAULT_THEME];
+  const uid = useId().replace(/[^a-zA-Z0-9]/g, '');
+  const svgRef = useRef<SVGSVGElement>(null);
+  const painting = useRef<string | null>(null);
+  const [hover, setHover] = useState<Cell | null>(null);
 
   if (p.testPattern) return <TestPattern puzzle={puzzle} width={p.width} height={p.height} />;
 
   const route = [puzzle.startCell, ...puzzle.targetEntries];
-  const routePts = route.map((c) => center(c).join(',')).join(' ');
   const routeSet = new Set(route.map(cellKey));
+  const routePts = route.map((c) => center(c).join(',')).join(' ');
   const indexLabels = new Map<string, number[]>();
   puzzle.targetEntries.forEach((c, i) => {
     const k = cellKey(c);
     indexLabels.set(k, [...(indexLabels.get(k) ?? []), i + 1]);
   });
-
   const cells: Cell[] = [];
   for (let r = 0; r < puzzle.rows; r++) for (let c = 0; c < puzzle.cols; c++) cells.push({ row: r, col: c });
 
+  // ---- pointer -> cell (works with letterboxing and touch via pointer capture)
+  const cellAt = (e: React.PointerEvent): Cell | null => {
+    const svg = svgRef.current;
+    const ctm = svg?.getScreenCTM();
+    if (!svg || !ctm) return null;
+    const pt = new DOMPoint(e.clientX, e.clientY).matrixTransform(ctm.inverse());
+    const c = { row: Math.floor(pt.y / CELL), col: Math.floor(pt.x / CELL) };
+    return c.row >= 0 && c.row < puzzle.rows && c.col >= 0 && c.col < puzzle.cols ? c : null;
+  };
+  const interactive = !!(p.onPaint || p.onCellClick);
+  const handlers = interactive ? {
+    onPointerDown: (e: React.PointerEvent<SVGSVGElement>) => {
+      const c = cellAt(e);
+      if (!c) return;
+      if (p.onPaint) {
+        e.currentTarget.setPointerCapture(e.pointerId);
+        painting.current = cellKey(c);
+        p.onPaint(c, 'start');
+      } else p.onCellClick?.(c);
+    },
+    onPointerMove: (e: React.PointerEvent<SVGSVGElement>) => {
+      const c = cellAt(e);
+      setHover(c);
+      if (c && p.onPaint && painting.current && painting.current !== cellKey(c)) {
+        painting.current = cellKey(c);
+        p.onPaint(c, 'move');
+      }
+    },
+    onPointerUp: (e: React.PointerEvent<SVGSVGElement>) => {
+      if (painting.current && p.onPaint) {
+        const c = cellAt(e);
+        if (c) p.onPaint(c, 'end');
+      }
+      painting.current = null;
+    },
+    onPointerLeave: () => setHover(null),
+  } : {};
+
+  const g = (n: string) => `${n}${uid}`;
+
   return (
     <svg
+      ref={svgRef}
       className={p.className}
       viewBox={`0 0 ${W} ${H}`}
-      width={p.width ?? W}
-      height={p.height ?? H}
+      // Numeric sizes go on attributes; CSS sizes like '100%'/'auto' must go in style.
+      width={typeof p.width === 'string' ? undefined : (p.width ?? W)}
+      height={typeof p.height === 'string' ? undefined : (p.height ?? H)}
       preserveAspectRatio="xMidYMid meet"
-      style={{ display: 'block' }}
+      style={{
+        display: 'block', touchAction: interactive ? 'none' : undefined, cursor: interactive ? 'pointer' : undefined,
+        width: typeof p.width === 'string' ? p.width : undefined,
+        height: typeof p.height === 'string' ? p.height : undefined,
+      }}
+      {...handlers}
     >
-      {/* Layer 1: decorative background artwork (prepared theme; AI artwork slots in here) */}
-      <rect width={W} height={H} fill={theme.ground} />
+      <defs>
+        <linearGradient id={g('tile')} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor={theme.tileTop} /><stop offset="1" stopColor={theme.tileBottom} />
+        </linearGradient>
+        <linearGradient id={g('route')} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor={theme.routeTop} /><stop offset="1" stopColor={theme.routeBottom} />
+        </linearGradient>
+        <linearGradient id={g('gloss')} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#fff" stopOpacity={theme.gloss} />
+          <stop offset="1" stopColor="#fff" stopOpacity={0} />
+        </linearGradient>
+        <radialGradient id={g('pad')}>
+          <stop offset="0" stopColor={theme.start} stopOpacity={0.35} />
+          <stop offset="1" stopColor={theme.start} stopOpacity={0.08} />
+        </radialGradient>
+      </defs>
+
+      {/* Layer 1: background artwork (prepared theme; AI artwork slots in here) */}
+      <rect width={W} height={H} fill={(p.showGrid ?? true) ? theme.ground : theme.tileBottom} />
       {cells.map((c) => {
         const k = cellKey(c);
-        const scenery = puzzle.sceneryCells.some((s) => sameCell(s, c));
-        if (routeSet.has(k)) return null;
+        const onRoute = routeSet.has(k);
+        const scenery = !onRoute && puzzle.sceneryCells.some((s) => sameCell(s, c));
+        const s = CELL - GAP * 2;
         return (
-          <g key={`bg${k}`} transform={`translate(${c.col * CELL},${c.row * CELL})`}>
-            <rect x={3} y={3} width={CELL - 6} height={CELL - 6} rx={10} fill={theme.tile} />
-            {scenery && theme.scenery(c)}
+          <g key={`t${k}`} transform={`translate(${c.col * CELL + GAP},${c.row * CELL + GAP})`}>
+            <rect width={s} height={s} rx={9} fill={`url(#${g(onRoute ? 'route' : 'tile')})`}
+                  stroke={theme.tileStroke} strokeWidth={1.5} />
+            {theme.gloss > 0 && <rect x={5} y={4} width={s - 10} height={s * 0.42} rx={7} fill={`url(#${g('gloss')})`} />}
+            <rect x={1} y={s - 5} width={s - 2} height={4} rx={2} fill="#000" opacity={0.04} />
+            {scenery && <g transform={`translate(${-GAP},${-GAP})`}>{theme.scenery(c)}</g>}
           </g>
         );
       })}
 
-      {/* Layer 2: exact route cues + grid (app-rendered, never derived from artwork) */}
-      {[...new Map(route.map((c) => [cellKey(c), c] as const)).values()].map((c) => (
-        <rect key={`rt${cellKey(c)}`} x={c.col * CELL + 2} y={c.row * CELL + 2}
-              width={CELL - 4} height={CELL - 4} rx={8} fill={theme.routeTile} />
-      ))}
-      <polyline points={routePts} fill="none" stroke={theme.road} strokeWidth={34}
-                strokeLinejoin="round" strokeLinecap="round" />
-      <polyline points={routePts} fill="none" stroke={theme.roadLine} strokeWidth={4}
-                strokeDasharray="14 12" strokeLinejoin="round" strokeLinecap="round" />
-      {(p.showGrid ?? true) && (
-        <g stroke={theme.grid} strokeWidth={2}>
-          {Array.from({ length: puzzle.cols + 1 }, (_, i) => (
-            <line key={`v${i}`} x1={i * CELL} y1={0} x2={i * CELL} y2={H} />
-          ))}
-          {Array.from({ length: puzzle.rows + 1 }, (_, i) => (
-            <line key={`h${i}`} x1={0} y1={i * CELL} x2={W} y2={i * CELL} />
-          ))}
-        </g>
+      {/* Layer 2: exact route cues (app-rendered, never derived from artwork) */}
+      {route.length > 1 && (
+        <>
+          <polyline points={routePts} fill="none" stroke={theme.road} strokeWidth={34} opacity={0.5}
+                    strokeLinejoin="round" strokeLinecap="round" />
+          <polyline points={routePts} fill="none" stroke={theme.roadLine} strokeWidth={4}
+                    strokeDasharray="2 14" strokeLinejoin="round" strokeLinecap="round" opacity={0.9} />
+        </>
       )}
 
       {/* Layer 3: start / goal indicators and labels */}
       <g transform={`translate(${center(puzzle.startCell).join(',')})`}>
-        <circle r={30} fill={theme.start} stroke="#fff" strokeWidth={5} />
-        <path d="M0,-22 L13,6 L0,0 L-13,6 Z" fill="#fff"
+        <circle r={38} fill={`url(#${g('pad')})`} stroke={theme.start} strokeWidth={3} strokeDasharray="6 6" />
+        <path d="M0,-34 L10,-22 L-10,-22 Z" fill={theme.start}
               transform={`rotate(${HEADING_ROT[puzzle.startHeading]})`} />
       </g>
-      <g transform={`translate(${center(puzzle.goalCell).join(',')})`}>
-        <circle r={32} fill="#fff" />
-        <circle r={24} fill={theme.goal} />
-        <circle r={14} fill="#fff" />
-        <circle r={7} fill={theme.goal} />
-      </g>
+      {route.length > 1 && (
+        <g transform={`translate(${center(puzzle.goalCell).join(',')})`}><CheckeredFlag /></g>
+      )}
       {(p.showIndices ?? true) && [...indexLabels].map(([k, idx]) => {
         const [r, c] = k.split(',').map(Number);
+        const label = idx.join(',');
+        const w = 14 + label.length * 9;
         return (
-          <text key={`ix${k}`} x={c * CELL + 8} y={r * CELL + 22} fontSize={18} fontWeight={700}
-                fill={theme.label} fontFamily="system-ui, sans-serif">{idx.join(',')}</text>
+          <g key={`ix${k}`} transform={`translate(${c * CELL + 10},${r * CELL + 10})`}>
+            <rect width={w} height={22} rx={11} fill={theme.badgeBg} opacity={0.92} />
+            <text x={w / 2} y={16} textAnchor="middle" fontSize={14} fontWeight={800} fill={theme.badgeFg}
+                  fontFamily="Nunito, system-ui, sans-serif">{label}</text>
+          </g>
         );
       })}
 
@@ -115,40 +185,76 @@ export function Board(p: Props) {
 
       {p.plannedEntries && p.plannedEntries.length > 0 && (
         <polyline points={[puzzle.startCell, ...p.plannedEntries].map((c) => center(c).join(',')).join(' ')}
-                  fill="none" stroke="#2563eb" strokeWidth={6} strokeDasharray="4 10"
+                  fill="none" stroke="#3f6fb5" strokeWidth={6} strokeDasharray="3 11"
                   strokeLinecap="round" strokeLinejoin="round" opacity={0.9} />
       )}
 
       {p.highlight?.map((c, i) => (
-        <rect key={`hl${i}`} x={c.col * CELL + 6} y={c.row * CELL + 6} width={CELL - 12} height={CELL - 12}
-              fill="none" stroke="#f59e0b" strokeWidth={6} rx={10} />
+        <rect key={`hl${i}`} x={c.col * CELL + 7} y={c.row * CELL + 7} width={CELL - 14} height={CELL - 14}
+              fill="none" stroke="#3f6fb5" strokeWidth={5} rx={11} opacity={0.85} />
       ))}
+      {interactive && hover && (
+        <rect x={hover.col * CELL + GAP} y={hover.row * CELL + GAP} width={CELL - GAP * 2} height={CELL - GAP * 2}
+              rx={9} fill="#5b8fd1" opacity={0.14} pointerEvents="none" />
+      )}
 
-      {(p.showRobot ?? true) && p.pose && <RobotGlyph pose={p.pose} />}
+      {/* Rover: live pose when we have one; otherwise (editor) parked on the start, facing its heading. */}
+      {(p.showRobot ?? true) && !p.pose && p.roverAtStart && (
+        <g transform={`translate(${center(puzzle.startCell).join(',')}) rotate(${HEADING_ROT[puzzle.startHeading]}) scale(0.95)`}>
+          <Rover />
+        </g>
+      )}
+      {(p.showRobot ?? true) && p.pose && (
+        <g transform={`translate(${p.pose.x * CELL},${p.pose.y * CELL}) rotate(${p.pose.headingDeg}) scale(0.95)`}
+           opacity={p.pose.trackingValid ? 1 : 0.55}>
+          <Rover stale={!p.pose.trackingValid} />
+        </g>
+      )}
 
       {p.markerMask ? <MarkerMasks W={W} H={H} size={p.markerMask * CELL} /> : null}
-
-      {p.onCellClick && cells.map((c) => (
-        <rect key={`hit${cellKey(c)}`} x={c.col * CELL} y={c.row * CELL} width={CELL} height={CELL}
-              fill="transparent" style={{ cursor: 'pointer' }} onClick={() => p.onCellClick!(c)} />
-      ))}
     </svg>
+  );
+}
+
+/** Checkered finish flag on a pole, centred on the goal cell. */
+function CheckeredFlag() {
+  const cols = 4, rows = 3, sq = 8;
+  const x0 = -6, y0 = -30;
+  const squares = [];
+  for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+    const wave = Math.sin((c / cols) * Math.PI) * 3; // gentle ripple
+    squares.push(
+      <rect key={`${r}${c}`} x={x0 + c * sq} y={y0 + r * sq + wave} width={sq + 0.4} height={sq + 0.4}
+            fill={(r + c) % 2 ? '#ffffff' : '#111111'} />,
+    );
+  }
+  return (
+    <g>
+      <circle r={34} fill="#fff" opacity={0.75} />
+      <circle r={34} fill="none" stroke="#111" strokeWidth={2} strokeDasharray="4 4" opacity={0.5} />
+      <ellipse cx={-8} cy={26} rx={10} ry={3} fill="#000" opacity={0.15} />
+      <line x1={-8} y1={26} x2={-8} y2={-32} stroke="#3a3a3a" strokeWidth={4} strokeLinecap="round" />
+      <circle cx={-8} cy={-33} r={3} fill="#f5c400" stroke="#3a3a3a" strokeWidth={1.5} />
+      <g stroke="#111" strokeWidth={1.5}>
+        {squares}
+      </g>
+    </g>
   );
 }
 
 function FeedbackTile({ k, t }: { k: string; t: TileState }) {
   if (t.kind === 'unvisited') return null;
   const [r, c] = k.split(',').map(Number);
-  const x = c * CELL, y = r * CELL, s = CELL;
+  const x = c * CELL + GAP, y = r * CELL + GAP, s = CELL - GAP * 2;
   const col = (ok: boolean | null) => (ok ? FEEDBACK.correct : FEEDBACK.incorrect);
   const sym = (ok: boolean | null) => (ok ? '✓' : '✗');
+  const font = 'Nunito, system-ui, sans-serif';
   if (t.kind === 'solid') {
     return (
       <g>
-        <rect x={x + 2} y={y + 2} width={s - 4} height={s - 4} fill={col(t.left)} opacity={0.88}
-              stroke="#fff" strokeWidth={4} />
+        <rect x={x} y={y} width={s} height={s} rx={9} fill={col(t.left)} opacity={0.9} />
         <text x={x + s / 2} y={y + s / 2 + 16} textAnchor="middle" fontSize={46} fontWeight={900}
-              fill="#fff" fontFamily="system-ui, sans-serif">{sym(t.left)}</text>
+              fill="#fff" fontFamily={font}>{sym(t.left)}</text>
       </g>
     );
   }
@@ -156,27 +262,13 @@ function FeedbackTile({ k, t }: { k: string; t: TileState }) {
   // right triangle touches bottom-right (LATEST).
   return (
     <g>
-      <polygon points={`${x},${y} ${x + s},${y} ${x},${y + s}`} fill={col(t.left)} opacity={0.9} />
-      <polygon points={`${x + s},${y} ${x + s},${y + s} ${x},${y + s}`} fill={col(t.right)} opacity={0.9} />
+      <polygon points={`${x},${y} ${x + s},${y} ${x},${y + s}`} fill={col(t.left)} opacity={0.92} />
+      <polygon points={`${x + s},${y} ${x + s},${y + s} ${x},${y + s}`} fill={col(t.right)} opacity={0.92} />
       <line x1={x} y1={y + s} x2={x + s} y2={y} stroke="#fff" strokeWidth={4} />
-      <rect x={x + 2} y={y + 2} width={s - 4} height={s - 4} fill="none" stroke="#fff" strokeWidth={4} />
       <text x={x + s * 0.3} y={y + s * 0.42} textAnchor="middle" fontSize={30} fontWeight={900}
-            fill="#fff" fontFamily="system-ui, sans-serif">{sym(t.left)}</text>
+            fill="#fff" fontFamily={font}>{sym(t.left)}</text>
       <text x={x + s * 0.7} y={y + s * 0.86} textAnchor="middle" fontSize={30} fontWeight={900}
-            fill="#fff" fontFamily="system-ui, sans-serif">{sym(t.right)}</text>
-    </g>
-  );
-}
-
-function RobotGlyph({ pose }: { pose: RobotPose }) {
-  const x = pose.x * CELL, y = pose.y * CELL;
-  const stale = !pose.trackingValid;
-  return (
-    <g transform={`translate(${x},${y}) rotate(${pose.headingDeg})`} opacity={stale ? 0.45 : 1}>
-      <rect x={-26} y={-30} width={52} height={60} rx={10} fill={stale ? '#9ca3af' : '#1d4ed8'}
-            stroke="#fff" strokeWidth={4} strokeDasharray={stale ? '6 6' : undefined} />
-      <path d="M0,-24 L14,0 L-14,0 Z" fill="#fff" />
-      {stale && <text y={22} textAnchor="middle" fontSize={22} fill="#fff" transform="rotate(0)">?</text>}
+            fill="#fff" fontFamily={font}>{sym(t.right)}</text>
     </g>
   );
 }

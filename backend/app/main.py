@@ -80,7 +80,29 @@ def get_state():
 
 @app.get("/api/puzzles")
 def list_puzzles():
-    return [p.model_dump(mode="json") for p in session.storage.list_puzzles()]
+    st = session.storage
+    return [{**p.model_dump(mode="json"), "builtin": st.is_builtin(p.id),
+             "edited": (st.dir / "puzzles" / f"{p.id}.json").exists()}
+            for p in st.list_puzzles()]
+
+
+@app.post("/api/puzzles")
+def save_puzzle_only(p: Puzzle):
+    """Save to the library without activating (allowed even while running)."""
+    if p.id == session.puzzle.id:
+        raise HTTPException(409, "this puzzle is active; use 'Save & use' instead")
+    session.storage.save_puzzle(p)
+    return p.model_dump(mode="json")
+
+
+@app.delete("/api/puzzles/{puzzle_id}")
+def delete_puzzle(puzzle_id: str):
+    if puzzle_id == session.puzzle.id:
+        raise HTTPException(409, "cannot delete the active puzzle; switch to another first")
+    result = session.storage.delete_puzzle(puzzle_id)
+    if result == "missing":
+        raise HTTPException(400, "bundled example puzzles can't be deleted")
+    return {"result": result}
 
 
 @app.put("/api/puzzle")
