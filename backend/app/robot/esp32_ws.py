@@ -24,6 +24,8 @@ class Esp32WebSocketRobot:
         self.url = url
         self.ack_timeout_s = ack_timeout_s
         self.on_pose: Optional[PoseCallback] = None  # camera supplies pose
+        self.continuous_supported = False
+        self._drive_seq = 0
         self._ws = None
         self._pending: dict[str, asyncio.Future] = {}
         self._tasks: list[asyncio.Task] = []
@@ -54,6 +56,8 @@ class Esp32WebSocketRobot:
                     try:
                         async for raw in ws:
                             msg = json.loads(raw)
+                            if msg.get("type") == "hello":
+                                self.continuous_supported = msg.get("protocolVersion") == 2
                             if msg.get("type") == "ack" and msg.get("status") != "ACCEPTED":
                                 fut = self._pending.pop(msg["msgId"], None)
                                 if fut and not fut.done():
@@ -63,6 +67,7 @@ class Esp32WebSocketRobot:
             except Exception:
                 pass
             self._ws = None
+            self.continuous_supported = False
             for fut in self._pending.values():
                 if not fut.done():
                     fut.set_result(Ack("?", "ERROR", "connection lost"))
@@ -91,6 +96,30 @@ class Esp32WebSocketRobot:
             return Ack(p.msgId, "ERROR", str(e))
         finally:
             self._pending.pop(p.msgId, None)
+
+    async def drive(self, action: str, amount: float, ttl_ms: int) -> dict:
+        if action == "STOP":
+            await self.stop("neutral input")
+            return {"status":"DONE"}
+        if not self._ws or not self.continuous_supported:
+            return {"status":"ERROR", "error":"continuous protocol v2 unavailable"}
+        self._drive_seq += 1
+        linear = amount if action == "FORWARD" else -amount if action == "BACKWARD" else 0
+        angular = amount if action == "RIGHT" else -amount if action == "LEFT" else 0
+        msg_id = f"drive-{time.time_ns()}"
+        future = asyncio.get_running_loop().create_future()
+        self._pending[msg_id] = future
+        try:
+            await self._ws.send(json.dumps({"type":"drive", "protocolVersion":2,
+                "msgId":msg_id, "seq":self._drive_seq,
+                "linear":linear, "angular":angular, "ttlMs":min(ttl_ms,250)}))
+            ack = await asyncio.wait_for(future,.2)
+            return ack.__dict__
+        except Exception as e:
+            await self.stop("continuous ack failure")
+            return {"status":"ERROR", "error":str(e)}
+        finally:
+            self._pending.pop(msg_id,None)
 
     async def stop(self, reason: str) -> None:
         if self._ws:

@@ -22,6 +22,7 @@ def now_ms() -> int:
 
 class SimulatedRobot:
     name = "simulator"
+    continuous_supported = True
 
     def __init__(self, speed_cells_s: float = 1.2, turn_deg_s: float = 180.0,
                  tick_s: float = 1 / 30, noise: float = 0.01):
@@ -31,6 +32,7 @@ class SimulatedRobot:
         self.noise = noise
         self.x, self.y, self.heading = 0.5, 0.5, 0.0
         self.on_pose: Optional[PoseCallback] = None
+        self._drive_task = None
         self._stop = asyncio.Event()
         self._done: dict[str, Ack] = {}
         self._lock = asyncio.Lock()
@@ -55,6 +57,7 @@ class SimulatedRobot:
             await asyncio.sleep(0.1)
 
     async def close(self):
+        await self.stop("shutdown")
         if self._idle_task:
             self._idle_task.cancel()
             await asyncio.gather(self._idle_task, return_exceptions=True)
@@ -126,5 +129,30 @@ class SimulatedRobot:
             await asyncio.sleep(self.tick)
         return "DONE"
 
+    async def drive(self, action: str, amount: float, ttl_ms: int) -> dict:
+        if not self.connected: return {"status":"ERROR", "error":"link down"}
+        if self._lock.locked() and self._drive_task is None: return {"status":"ERROR", "error":"discrete command in progress"}
+        await self.stop("new drive sample")
+        if action == "STOP": return {"status":"DONE"}
+        self._stop.clear()
+        async def move_until_expired():
+            end = time.monotonic()+min(ttl_ms,250)/1000
+            async with self._lock:
+                while time.monotonic()<end and not self._stop.is_set():
+                    if action in ("LEFT","RIGHT"):
+                        self.heading=(self.heading+(1 if action=="RIGHT" else -1)*self.turn_rate*amount*self.tick)%360
+                    else:
+                        rad=math.radians(self.heading)
+                        step=(1 if action=="FORWARD" else -1)*self.speed*amount*self.tick
+                        self.x+=math.sin(rad)*step; self.y-=math.cos(rad)*step
+                    self._emit()
+                    await asyncio.sleep(self.tick)
+        self._drive_task=asyncio.create_task(move_until_expired())
+        return {"status":"ACCEPTED"}
+
     async def stop(self, reason: str) -> None:
         self._stop.set()
+        if self._drive_task:
+            self._drive_task.cancel()
+            await asyncio.gather(self._drive_task, return_exceptions=True)
+            self._drive_task=None

@@ -56,7 +56,9 @@ export type Attempt = {
   stopReason: string | null; summary: AttemptSummary | null;
 };
 
+export type Student = { id: string; name: string; synthetic: boolean };
 export type Recording = {
+  id?: string; approximate?: boolean; mode?: string;
   actions: { action: Op; observedEntries: Cell[] }[];
   generated: Instruction[] | null; warnings: string[]; path: Cell[];
   startCell?: Cell; graded?: boolean;
@@ -65,6 +67,8 @@ export type Recording = {
 export type CameraStatus = { role: string; generation: number; calibrated: boolean; ready: boolean; error: string | null; resolution: number[] | null; timestampMs: number; index: number };
 
 export type Snapshot = {
+  studentId: string | null;
+  joystick: {active:boolean;error:string|null};
   sessionId: string;
   camera: CameraStatus | null;
   seq: number;
@@ -79,7 +83,7 @@ export type Snapshot = {
   attemptHistory: Pick<Attempt, 'id' | 'startedAt' | 'stopReason' | 'summary'>[];
   tiles: Record<string, TileState>;
   pose: RobotPose | null;
-  robot: { adapter: string; connected: boolean };
+  robot: { adapter: string; connected: boolean; continuousSupported?: boolean };
   recording: Recording;
   feed: { t: number; level: 'info' | 'warn' | 'error'; msg: string }[];
   tilePolicy: string;

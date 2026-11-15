@@ -141,5 +141,9 @@ class OpenCvCardRecognizer:
                     cv2.imencode(".png", crop)[1].tobytes()).decode()
                 if self.ocr:
                     card.rawSteps, card.stepsConfidence = self.ocr(crop)
+                    card.ocrText = getattr(self.ocr, "last_text", None)
+                    card.ocrModel = getattr(self.ocr, "model_id", None)
+                    if getattr(self.ocr, "error", None):
+                        card.issues.append("OCR unavailable; enter number manually")
             cards.append(card)
         return finalize(cards, "opencv")

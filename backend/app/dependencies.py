@@ -15,10 +15,19 @@ def build_session(settings: Settings | None = None) -> Session:
         robot = SimulatedRobot()
     if cfg.cards == "opencv":
         from .vision.cards import OpenCvCardRecognizer
-        recognizer = OpenCvCardRecognizer(cfg.card_camera)
+        ocr = None
+        if cfg.ocr:
+            from .vision.ocr import LocalHandwritingOcr
+            ocr = LocalHandwritingOcr()
+        recognizer = OpenCvCardRecognizer(cfg.card_camera, ocr=ocr)
     else:
         recognizer = FixtureCardRecognizer(FIXTURES / "scans")
-    return Session(robot, recognizer, Storage(cfg.data_dir))
+    if cfg.storage == "sqlite":
+        from .sqlite_store import SQLiteStorage
+        store = SQLiteStorage(cfg.data_dir)
+    else:
+        store = Storage(cfg.data_dir)
+    return Session(robot, recognizer, store)
 
 
 def build_tracker(session: Session, settings: Settings):
