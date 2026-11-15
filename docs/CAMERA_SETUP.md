@@ -22,7 +22,7 @@ as it enters each one. No printed markers are needed on the board or the robot.
    and watch tiles light up. It ends when the last route cell is entered (or press End test).
 
 Recalibrate whenever the camera or projector moves. Calibration is saved in
-`data/camera_calibration.json` and survives restarts and puzzle-size changes.
+`data/board_camera_calibration.json` and survives restarts and puzzle-size changes.
 
 ## How it detects the robot
 

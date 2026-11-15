@@ -43,10 +43,15 @@ export function RecordingTab({ snap }: { snap: Snapshot }) {
     <TwoCol
       left={
         <>
+          <Card title="Continuous joystick" subtitle="The separate ESP32-S3 sends axes/button over USB serial. Neutral, stale input, and disconnect stop motors. Review generated code in History.">
+            <p>{snap.joystick?.active ? 'Continuous recording active' : `${snap.joystick?.connected ? 'Connected' : 'Disconnected'} · ${snap.joystick?.armed ? 'armed' : 'neutral / released input required'} · ${snap.joystick?.fresh ? 'fresh' : 'stale'}`} · {snap.robot.continuousSupported ? 'continuous protocol ready' : 'continuous firmware unavailable'}</p>
+            {snap.joystick?.error && <p className="warn">{snap.joystick.error}</p>}
+            {snap.robot.adapter === 'simulator' && <ContinuousSimulator />}
+          </Card>
           <Card title="Drive to write code"
                 subtitle="A student drives with the joystick; the app writes the matching cards. It shows the route they drove — not necessarily the only solution.">
             <label className="check"><input type="checkbox" checked={grade} disabled={recording}
-              onChange={(e) => setGrade(e.target.checked)} /> Also grade against this puzzle's route</label>
+              onChange={(e) => {setGrade(e.target.checked);run(() => api.setRecordingGrade(e.target.checked));}} /> Also grade against this puzzle's route</label>
             <div className="row">
               <button className={recording ? 'stop big' : 'go big'} onClick={() => run(() => api.toggleRecording(grade, 'ui'))}>
                 {recording ? '■ Stop recording' : '● Start recording'}
@@ -79,7 +84,7 @@ export function RecordingTab({ snap }: { snap: Snapshot }) {
               <Blocks program={rec.generated} />
               <div className="row">
                 <button onClick={exportJson}>⇩ Export JSON</button>
-                <button className="primary" onClick={() => run(() => api.confirm(rec.generated!))}>Load as program</button>
+                <button className="primary" disabled={!rec.id} onClick={() => {if(window.confirm('I reviewed the generated code and warnings. Load without running?')) run(() => api.confirmRecording(rec.id!,true));}}>Load as program</button>
               </div>
             </Card>
           )}
@@ -87,10 +92,26 @@ export function RecordingTab({ snap }: { snap: Snapshot }) {
       }
       right={
         <BoardCard title={snap.puzzle.name} extra={recording ? <span className="state state-RECORDING">● REC</span> : undefined}>
-          <Board puzzle={snap.puzzle} tiles={snap.tiles} pose={snap.pose} theme={snap.projection.theme}
+          <Board puzzle={snap.puzzle} tiles={snap.tiles} pose={snap.pose} theme={snap.projection.theme} artworkUrl={snap.projection.artworkId ? `/api/themes/${snap.projection.artworkId}/image` : null}
                  highlight={rec.path} width="100%" height="auto" />
         </BoardCard>
       }
     />
   );
+}
+
+function ContinuousSimulator() {
+  const seq=useRef(Date.now());
+  const input=useRef({x:0,y:0,button:false});
+  const {run,error}=useAction();
+  const [inputError,setInputError]=useState<string|null>(null);
+  useEffect(()=>{
+    const timer=window.setInterval(()=>{api.joystickSample({protocolVersion:1,seq:seq.current++,timestampMs:Date.now(),...input.current}).then(()=>setInputError(null)).catch(e=>setInputError(e.message));},50);
+    return ()=>{window.clearInterval(timer);api.stop().catch(e=>console.error("Stop request failed",e));};
+  },[]);
+  const buttons=[['Forward',0,-.4],['Backward',0,.4],['Left',-.4,0],['Right',.4,0]] as const;
+  return <><p>Simulator-only continuous input: hold a direction; release to stop.</p>
+    <button onPointerDown={()=>{input.current.button=true;}} onPointerUp={()=>{input.current.button=false;}} onPointerLeave={()=>{input.current.button=false;}}>Recording button (press/release)</button>
+    {buttons.map(([label,x,y])=><button key={label} onPointerDown={()=>{input.current.x=x;input.current.y=y;}} onPointerUp={()=>{input.current.x=0;input.current.y=0;}} onPointerLeave={()=>{input.current.x=0;input.current.y=0;}}>{label}</button>)}
+    <button onClick={()=>run(()=>api.stop())}>Stop continuous</button><ErrorBox error={error ?? inputError}/></>;
 }

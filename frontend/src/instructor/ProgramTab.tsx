@@ -13,7 +13,7 @@ type Row = {
 const needsNumber = (op: Op | null) => op === 'FORWARD' || op === 'BACKWARD';
 
 export function ProgramTab({ snap, onRun }: { snap: Snapshot; onRun: () => void }) {
-  const { run, error, busy } = useAction();
+  const { run, error, busy, setError } = useAction();
   const [rows, setRows] = useState<Row[]>([]);
   const [check, setCheck] = useState<{ ok: boolean; errors: string[]; plannedEntries?: Cell[] } | null>(null);
 
@@ -22,7 +22,7 @@ export function ProgramTab({ snap, onRun }: { snap: Snapshot; onRun: () => void 
     if (!snap.scan) return;
     setRows(snap.scan.cards.map((c) => ({
       op: c.op, cardId: c.cardId, rawSteps: c.rawSteps, confidence: c.stepsConfidence, crop: c.cropDataUrl,
-      steps: c.rawSteps, issues: c.issues, reviewed: c.issues.length === 0,
+      steps: c.rawSteps, issues: c.issues, reviewed: c.issues.length === 0 && !needsNumber(c.op),
     })));
   }, [snap.scan?.scanId]);
 
@@ -35,10 +35,13 @@ export function ProgramTab({ snap, onRun }: { snap: Snapshot; onRun: () => void 
 
   useEffect(() => {
     if (!program.length || missingNumbers) { setCheck(null); return; }
+    let disposed = false;
+    setCheck(null);
     const t = setTimeout(() => {
-      api.validate(program).then(setCheck).catch(() => setCheck(null));
+      api.validate(program).then(result => {if(!disposed){setCheck(result);setError(null);}})
+        .catch(e => {if(!disposed){setCheck(null);setError(e.message);}});
     }, 150);
-    return () => clearTimeout(t);
+    return () => {disposed=true;clearTimeout(t);};
   }, [JSON.stringify(program), missingNumbers]);
 
   const setRow = (i: number, patch: Partial<Row>) => setRows((rs) => rs.map((r, j) => (j === i ? { ...r, ...patch } : r)));
@@ -56,8 +59,9 @@ export function ProgramTab({ snap, onRun }: { snap: Snapshot; onRun: () => void 
     <TwoCol
       left={
         <>
-          <Card step="1" title="Scan the cards" subtitle="Cards are read only when you press Scan — never continuously.">
+          <Card step="1" title="Scan the cards" subtitle="For physical scans, select Scan camera first; review every numeric value.">
             <div className="row">
+              <button disabled={!canEdit || busy} onClick={() => run(() => api.clearScan())}>Manual program / clear scan</button>
               <button className="primary" disabled={!canEdit || busy} onClick={() => run(() => api.scan())}>📷 Scan cards</button>
               {snap.scan && <span className="muted small">Scan {snap.scan.scanId} · {snap.scan.source}</span>}
             </div>
@@ -86,7 +90,7 @@ export function ProgramTab({ snap, onRun }: { snap: Snapshot; onRun: () => void 
                       </td>
                       <td className="small">
                         {r.crop && <img src={r.crop} className="crop" />}
-                        {needsNumber(r.op) && (r.rawSteps != null ? `${r.rawSteps} · ${Math.round((r.confidence ?? 0) * 100)}%` : 'unreadable')}
+                        {needsNumber(r.op) && (r.rawSteps != null ? `${r.rawSteps} · ${r.confidence == null ? 'uncalibrated / uncertain' : `${Math.round(r.confidence * 100)}%`}` : 'unreadable')}
                         {r.issues.map((x, k) => <div key={k} className="issue">{x}</div>)}
                         {!r.reviewed && <button className="ghost" onClick={() => setRow(i, { reviewed: true })}>✓ Looks right</button>}
                       </td>
@@ -111,7 +115,7 @@ export function ProgramTab({ snap, onRun }: { snap: Snapshot; onRun: () => void 
 
           <Card step="3" title="Confirm & run" subtitle="Confirming freezes the program — moving cards afterwards has no effect.">
             <div className="row">
-              <button className="primary" disabled={!canConfirm || busy} onClick={() => run(() => api.confirm(program))}>
+              <button className="primary" disabled={!canConfirm || busy} onClick={() => run(() => api.confirm(program, snap.scan?.scanId, true))}>
                 Confirm program
               </button>
               <button className="go" disabled={snap.state !== 'PROGRAM_READY' || busy}
@@ -128,7 +132,7 @@ export function ProgramTab({ snap, onRun }: { snap: Snapshot; onRun: () => void 
       right={
         <BoardCard title={snap.puzzle.name}
                    extra={<span className="muted small">Dotted line = where this program would drive</span>}>
-          <Board puzzle={snap.puzzle} tiles={snap.tiles} pose={snap.pose} theme={snap.projection.theme}
+          <Board puzzle={snap.puzzle} tiles={snap.tiles} pose={snap.pose} theme={snap.projection.theme} artworkUrl={snap.projection.artworkId ? `/api/themes/${snap.projection.artworkId}/image` : null}
                  plannedEntries={check?.ok ? check.plannedEntries : snap.plannedEntries} width="100%" height="auto" />
         </BoardCard>
       }

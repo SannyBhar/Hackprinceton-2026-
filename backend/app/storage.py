@@ -33,20 +33,32 @@ class Storage:
                 out[p.id] = p
         return list(out.values())
 
+    def list_library(self) -> list[dict]:
+        return [{**p.model_dump(mode="json"), "builtin": self.is_builtin(p.id),
+                 "edited": (self.dir / "puzzles" / f"{p.id}.json").exists()}
+                for p in self.list_puzzles()]
+
     def is_builtin(self, puzzle_id: str) -> bool:
         return any(Puzzle.model_validate_json(f.read_text()).id == puzzle_id
                    for f in (FIXTURES / "puzzles").glob("*.json"))
 
     def delete_puzzle(self, puzzle_id: str) -> str:
         """Remove a user puzzle. For a bundled example this only reverts local edits."""
+        import re
+        if not re.fullmatch(r"[A-Za-z0-9_-]{1,80}", puzzle_id):
+            return "missing"
         f = self.dir / "puzzles" / f"{puzzle_id}.json"
         if not f.exists():
             return "missing"
         f.unlink()
         return "reverted" if self.is_builtin(puzzle_id) else "deleted"
 
-    def save_puzzle(self, p: Puzzle) -> None:
+    def save_puzzle(self, p: Puzzle) -> Puzzle:
+        existing = next((old for old in self.list_puzzles() if old.id == p.id), None)
+        if existing and existing != p and p.version <= existing.version:
+            p = p.model_copy(update={"version":existing.version+1})
         self._write(self.dir / "puzzles" / f"{p.id}.json", p.model_dump(mode="json"))
+        return p
 
     def load_calibration(self) -> Optional[ProjectorCalibration]:
         f = self.dir / "projector_calibration.json"
@@ -57,3 +69,26 @@ class Storage:
 
     def save_attempt(self, attempt_id: str, record: dict) -> None:
         self._write(self.dir / "attempts" / f"{attempt_id}.json", record)
+
+    def list_attempts(self):
+        return sorted([json.loads(f.read_text()) for f in (self.dir / "attempts").glob("*.json")], key=lambda r:r.get("startedAt",0))
+
+    def _record_path(self, kind, id):
+        import re
+        from .repository import RECORD_KINDS as KINDS
+        if kind not in KINDS or not re.fullmatch(r"[A-Za-z0-9_-]{1,80}", id):
+            raise ValueError("invalid record identifier")
+        path = self.dir / kind / (id + ".json")
+        path.parent.mkdir(exist_ok=True)
+        return path
+
+    def put_record(self, kind, id, body):
+        self._write(self._record_path(kind,id),body)
+
+    def get_record(self, kind, id):
+        path = self._record_path(kind,id)
+        return json.loads(path.read_text()) if path.exists() else None
+
+    def list_records(self, kind):
+        path = self._record_path(kind,"index").parent
+        return [json.loads(f.read_text()) for f in sorted(path.glob("*.json"))]

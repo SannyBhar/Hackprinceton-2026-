@@ -10,7 +10,7 @@ from __future__ import annotations
 from enum import Enum
 from typing import Literal, Optional
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator, StrictInt
 
 Heading = Literal["N", "E", "S", "W"]
 HEADINGS: list[str] = ["N", "E", "S", "W"]
@@ -33,7 +33,7 @@ Op = Literal["START", "STOP", "LEFT", "RIGHT", "FORWARD", "BACKWARD"]
 
 class Instruction(BaseModel):
     op: Op
-    steps: Optional[int] = None
+    steps: Optional[StrictInt] = None
     cardId: Optional[int] = None
 
     @model_validator(mode="after")
@@ -83,9 +83,9 @@ class Puzzle(BaseModel):
 
 class RobotPose(BaseModel):
     timestampMs: int
-    x: float
-    y: float
-    headingDeg: float
+    x: float = Field(allow_inf_nan=False)
+    y: float = Field(allow_inf_nan=False)
+    headingDeg: float = Field(allow_inf_nan=False)
     trackingValid: bool = True
 
 
@@ -114,6 +114,7 @@ class StopReason(str, Enum):
     INSTRUCTOR_STOP = "INSTRUCTOR_STOP"
     BOUNDARY = "BOUNDARY"
     TRACKING_LOST = "TRACKING_LOST"
+    TRACKING_UNCERTAIN = "TRACKING_UNCERTAIN"
     CONNECTION_LOST = "CONNECTION_LOST"
     ROBOT_FAULT = "ROBOT_FAULT"
     RECORDING_ENDED = "RECORDING_ENDED"
@@ -124,6 +125,8 @@ class ScannedCard(BaseModel):
     order: int
     cardId: Optional[int]
     op: Optional[Op]
+    ocrText: Optional[str] = None
+    ocrModel: Optional[str] = None
     rawSteps: Optional[int] = None          # OCR candidate, never used directly
     stepsConfidence: Optional[float] = None
     markerConfidence: float = 1.0
@@ -140,22 +143,38 @@ class ScanResult(BaseModel):
 
 
 class Corner(BaseModel):
-    x: float  # normalised 0..1 of projection viewport width
-    y: float
+    x: float = Field(ge=0, le=1, allow_inf_nan=False)  # normalised 0..1 of projection viewport width
+    y: float = Field(ge=0, le=1, allow_inf_nan=False)
 
 
 class ProjectorCalibration(BaseModel):
     """Projected-board quadrilateral TL, TR, BR, BL in normalised viewport coordinates."""
     corners: list[Corner] = Field(min_length=4, max_length=4)
-    viewportWidth: int
-    viewportHeight: int
+    viewportWidth: int = Field(gt=0)
+    viewportHeight: int = Field(gt=0)
     markerMask: float = 0.35  # fraction of a cell kept dark at each board corner
     showGrid: bool = True
+
+    @model_validator(mode="after")
+    def _convex(self):
+        points = self.corners
+        for i in range(4):
+            a, b, c = points[i], points[(i+1)%4], points[(i+2)%4]
+            if (b.x-a.x)*(c.y-b.y)-(b.y-a.y)*(c.x-b.x) <= 1e-8:
+                raise ValueError("projector corners must be convex TL/TR/BR/BL")
+        return self
 
 
 class ProjectionSettings(BaseModel):
     calibrating: bool = False
     testPattern: bool = False
     activeCorner: int = 0
+    artworkId: Optional[str] = None
+    artworkHash: Optional[str] = None
     theme: str = "glossy"          # prepared fallback theme id (AI artwork is a later milestone)
     showRobot: bool = True         # draw the tracked robot glyph on the projection
+
+
+def puzzle_hash(puzzle: Puzzle) -> str:
+    import hashlib
+    return hashlib.sha256(puzzle.model_dump_json().encode()).hexdigest()

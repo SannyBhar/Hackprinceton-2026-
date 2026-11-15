@@ -268,7 +268,9 @@ class BoardCamera:
                  camera: CameraService | None = None, hz: float = 30.0):
         self.get_board = get_board         # -> (rows, cols, corner-mask fraction, start heading)
         self.on_pose = on_pose
-        self.path = Path(data_dir) / "camera_calibration.json"
+        # Own file: data/camera_calibration.json belongs to the marker-based CameraCoordinator.
+        self.path = Path(data_dir) / "board_camera_calibration.json"
+        self._legacy_path = Path(data_dir) / "camera_calibration.json"
         self.camera = camera or CameraService()
         self.detector = RobotDetector()
         self.period = 1.0 / hz
@@ -286,7 +288,18 @@ class BoardCamera:
         try:
             return CameraCalibration(**json.loads(self.path.read_text()))
         except (OSError, ValueError, TypeError):
-            return None
+            pass
+        # One-time migration: earlier builds saved this calibration as camera_calibration.json.
+        # Only take that file if it has OUR schema (the coordinator's has a 'homography' instead).
+        try:
+            data = json.loads(self._legacy_path.read_text())
+            if "corners" in data and "homography" not in data:
+                cal = CameraCalibration(**data)
+                self._save(cal)
+                return cal
+        except (OSError, ValueError, TypeError):
+            pass
+        return None
 
     def _save(self, cal: CameraCalibration):
         self.path.parent.mkdir(parents=True, exist_ok=True)

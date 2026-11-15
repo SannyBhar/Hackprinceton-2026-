@@ -46,7 +46,9 @@ def finalize(cards: list[ScannedCard], source: str) -> ScanResult:
         if c.op in ("FORWARD", "BACKWARD"):
             if c.rawSteps is None:
                 c.issues.append("step count unreadable — instructor must enter it")
-            elif (c.stepsConfidence or 0) < 0.85:
+            elif c.stepsConfidence is None:
+                c.issues.append("OCR confidence uncalibrated; instructor review required")
+            elif c.stepsConfidence < 0.85:
                 c.issues.append("low-confidence step count — confirm it")
     if not cards:
         errors.append("no cards detected on the scan mat")
@@ -78,8 +80,8 @@ class FixtureCardRecognizer:
 
 
 class OcrPort(Protocol):
-    """Existing numeric-crop callback; no handwriting model is provided."""
-    def __call__(self, gray_crop: object) -> tuple[int | None, float]: ...
+    """Numeric-crop callback; confidence is None when the OCR adapter is uncalibrated."""
+    def __call__(self, gray_crop: object) -> tuple[int | None, float | None]: ...
 
 
 class OpenCvCardRecognizer:
@@ -141,5 +143,9 @@ class OpenCvCardRecognizer:
                     cv2.imencode(".png", crop)[1].tobytes()).decode()
                 if self.ocr:
                     card.rawSteps, card.stepsConfidence = self.ocr(crop)
+                    card.ocrText = getattr(self.ocr, "last_text", None)
+                    card.ocrModel = getattr(self.ocr, "model_id", None)
+                    if getattr(self.ocr, "error", None):
+                        card.issues.append("OCR unavailable; enter number manually")
             cards.append(card)
         return finalize(cards, "opencv")

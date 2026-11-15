@@ -1,0 +1,12 @@
+{
+  "cellCm": 22,
+  "supplyVolts": 6,
+  "motorRatingVerified": false,
+  "wiringVerified": false,
+  "polarity": [null, null, null, null],
+  "msPerCell": null,
+  "msPer90": null,
+  "driveDuty": null,
+  "turnDuty": null,
+  "acknowledged": false
+}

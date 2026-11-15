@@ -44,45 +44,34 @@ def test_card_capture_uses_injected_source_and_five_frames(monkeypatch):
     assert len(reads) == 5 and roles == [(0, 'scan')]
 
 
-async def test_runtime_owns_tracker_and_session_shutdown(tmp_path, monkeypatch):
+async def test_runtime_owns_board_camera_and_session_shutdown(tmp_path, monkeypatch):
     import asyncio
     from app import runtime
     from app.settings import Settings
     s = build_session(Settings(data_dir=tmp_path))
-    closed = []
-    async def track():
+    closed, stopped = [], []
+    async def run():
         try:
             await asyncio.Event().wait()
         finally:
             closed.append(True)
-    monkeypatch.setattr(runtime, 'build_tracker', lambda *args: SimpleNamespace(run=track))
+    def build(session, settings):
+        session.board_camera = SimpleNamespace(run=run, stop_camera=lambda: stopped.append(True),
+                                               status=lambda: {})
+        return session.board_camera
+    monkeypatch.setattr(runtime, 'build_board_camera', build)
     async with runtime.running_session(s):
         await asyncio.sleep(0)
         assert s.pose is not None
-    assert closed == [True]
+    assert closed == [True] and stopped == [True]   # tracking loop cancelled, webcam released
     assert all(t.done() for t in s._bg)
     assert s.robot._idle_task.cancelled()
 
 
-async def test_tracker_uses_camera_boundary_and_releases_on_cancel():
-    import asyncio
-    from app.vision.camera_tracker import CameraTracker
-    roles, released = [], []
-    @contextmanager
-    def open_camera(index, role):
-        roles.append((index, role))
-        try:
-            yield SimpleNamespace(read=lambda: (True, 'frame'))
-        finally:
-            released.append(True)
-    tracker = CameraTracker.__new__(CameraTracker)
-    tracker.camera = SimpleNamespace(open=open_camera)
-    tracker.camera_index, tracker.period = 1, 0.01
-    received = asyncio.Event()
-    tracker.process = lambda frame: frame
-    tracker.on_pose = lambda pose: received.set()
-    task = asyncio.create_task(tracker.run())
-    await asyncio.wait_for(received.wait(), 2)
-    task.cancel()
-    await asyncio.gather(task, return_exceptions=True)
-    assert roles == [(1, 'track')] and released == [True]
+async def test_dead_transport_stop_does_not_break_cleanup():
+    from app.robot.esp32_ws import Esp32WebSocketRobot
+    class Dead:
+        async def send(self,*args):raise OSError('connection closed')
+    r=Esp32WebSocketRobot('ws://unused');r._ws=Dead();r.continuous_supported=True
+    await r.stop('operator stop')
+    assert not r.connected and not r.continuous_supported

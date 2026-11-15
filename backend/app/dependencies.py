@@ -15,31 +15,32 @@ def build_session(settings: Settings | None = None) -> Session:
         robot = SimulatedRobot()
     if cfg.cards == "opencv":
         from .vision.cards import OpenCvCardRecognizer
-        recognizer = OpenCvCardRecognizer(cfg.card_camera)
+        ocr = None
+        if cfg.ocr:
+            from .vision.ocr import LocalHandwritingOcr
+            ocr = LocalHandwritingOcr()
+        recognizer = OpenCvCardRecognizer(cfg.card_camera, ocr=ocr)
     else:
         recognizer = FixtureCardRecognizer(FIXTURES / "scans")
-    return Session(robot, recognizer, Storage(cfg.data_dir))
-
-
-def build_tracker(session: Session, settings: Settings):
-    if settings.tracker != "camera":
-        return None
-    from .vision.camera_tracker import CameraTracker
-    tracker = CameraTracker(session.puzzle.rows, session.puzzle.cols, settings.track_camera)
-    tracker.on_pose = session.on_pose
-    return tracker
+    if cfg.storage == "sqlite":
+        from .sqlite_store import SQLiteStorage
+        store = SQLiteStorage(cfg.data_dir)
+    else:
+        store = Storage(cfg.data_dir)
+    return Session(robot, recognizer, store)
 
 
 def build_board_camera(session: Session, settings: Settings):
     """Markerless overhead-camera tracking. The camera only opens when started from the UI/API
-    (or automatically with CA_TRACKER=board-camera), so tests and sim runs never touch it."""
+    (or automatically with CA_TRACKER=camera), so tests and sim runs never touch it."""
     from .vision.board_camera import BoardCamera
     cam = BoardCamera(
         lambda: (session.puzzle.rows, session.puzzle.cols, session.calibration.markerMask,
                  session.puzzle.startHeading),
         session.camera_pose, settings.data_dir)
     session.board_camera = cam
-    if settings.tracker == "board-camera":
+    holder = getattr(session, "camera", None)          # card-scanning webcam, if configured
+    if settings.tracker in ("camera", "board-camera") and (holder is None or holder.role == "closed"):
         cam.start_camera(settings.track_camera)
         session.pose_source = "camera"
     return cam

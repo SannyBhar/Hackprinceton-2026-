@@ -18,7 +18,7 @@ demo from the simulator if any hardware piece slips.
 | Instructor UI: Setup, Puzzle editor, Scan review, Live attempt, Recording | Done (functional, unpolished) |
 | Joystick recording → blocks (browser Gamepad + keyboard) | Done + tested with simulator |
 | Card recognition | Fixture adapter done; OpenCV/ArUco adapter written, **untested**; OCR = none (manual entry) |
-| Overhead camera tracker | Written, **untested** |
+| Overhead camera tracker | Markerless; verified on real frames with a static robot (docs/CAMERA_SETUP.md) |
 | ESP32 transport + firmware | Written, **untested**; GPIO/motor values are placeholders |
 | AI theme generation | Not started (prepared offline themes in place) |
 

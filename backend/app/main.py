@@ -15,7 +15,7 @@ from fastapi import FastAPI, File, HTTPException, UploadFile, WebSocket, WebSock
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, Response, StreamingResponse
-from pydantic import BaseModel
+from pydantic import StrictBool, StrictInt, BaseModel, Field
 
 from .models import Instruction, ProjectionSettings, ProjectorCalibration, Puzzle, SessionState
 from .robot.simulator import SimulatedRobot
@@ -59,10 +59,7 @@ def get_state():
 
 @app.get("/api/puzzles")
 def list_puzzles():
-    st = session.storage
-    return [{**p.model_dump(mode="json"), "builtin": st.is_builtin(p.id),
-             "edited": (st.dir / "puzzles" / f"{p.id}.json").exists()}
-            for p in st.list_puzzles()]
+    return session.storage.list_library()
 
 
 @app.post("/api/puzzles")
@@ -70,7 +67,7 @@ def save_puzzle_only(p: Puzzle):
     """Save to the library without activating (allowed even while running)."""
     if p.id == session.puzzle.id:
         raise HTTPException(409, "this puzzle is active; use 'Save & use' instead")
-    session.storage.save_puzzle(p)
+    p = session.storage.save_puzzle(p)
     return p.model_dump(mode="json")
 
 
@@ -86,6 +83,10 @@ def delete_puzzle(puzzle_id: str):
 
 @app.put("/api/puzzle")
 async def put_puzzle(p: Puzzle):
+    if session.state.value in ("RUNNING","RECORDING"):
+        raise HTTPException(409,"stop before changing puzzle")
+    # Reserve the persisted revision off-loop; recheck live state in set_puzzle.
+    p = await asyncio.to_thread(session.storage.save_puzzle,p)
     await guard(session.set_puzzle, p)
     return session.puzzle.model_dump(mode="json")
 
@@ -97,24 +98,26 @@ async def put_calibration(c: ProjectorCalibration):
 
 
 @app.put("/api/projection")
-def put_projection(ps: ProjectionSettings):
-    session.set_projection(ps)
+async def put_projection(ps: ProjectionSettings):
+    await guard(session.set_projection, ps)
     return {"ok": True}
 
 
 @app.post("/api/scan")
 async def scan(image: Optional[UploadFile] = File(None)):
     data = await image.read() if image else None
-    return (await guard(session.do_scan, data)).model_dump(mode="json")
+    return (await guard(session.scan_async, data)).model_dump(mode="json")
 
 
 class ProgramBody(BaseModel):
     instructions: list[Instruction]
+    scanId: str | None = None
+    reviewed: bool = False
 
 
 @app.post("/api/program/confirm")
 async def confirm(body: ProgramBody):
-    r = await guard(session.confirm_program, body.instructions)
+    r = await guard(session.confirm_program, body.instructions, body.scanId, body.reviewed)
     return {"ok": True, "plannedEntries": [c.model_dump() for c in r.plannedEntries]}
 
 
@@ -171,7 +174,7 @@ class FaultBody(BaseModel):
 
 
 @app.post("/api/sim/fault")
-def sim_fault(body: FaultBody):
+async def sim_fault(body: FaultBody):
     r = session.robot
     if not isinstance(r, SimulatedRobot):
         raise HTTPException(400, "fault injection only available with the simulator")
@@ -204,6 +207,9 @@ def board_camera_start(body: BoardCameraStartBody):
         import cv2  # noqa: F401
     except ImportError:
         raise HTTPException(501, "OpenCV not installed: pip install -r backend/requirements-vision.txt")
+    if session.camera is not None and session.camera.role != "closed":
+        # One webcam, one owner: the marker-based coordinator currently holds it.
+        raise HTTPException(409, f"the shared webcam is in '{session.camera.role}' mode; close it first")
     _board_camera().start_camera(body.index)
     session.log("info", f"camera {body.index} started")
     session.changed()
@@ -303,17 +309,101 @@ async def manual_start():
 @app.websocket("/ws")
 async def ws(websocket: WebSocket):
     await websocket.accept()
-    q: asyncio.Queue = asyncio.Queue()
+    q: asyncio.Queue = asyncio.Queue(maxsize=512)
     session.subscribers.add(q)
     try:
         await websocket.send_json({"seq": session.seq, "type": "snapshot", "payload": session.snapshot()})
         while True:
             msg = await q.get()
+            if msg is None:
+                await websocket.close(code=1013)
+                return
             await websocket.send_json(msg)
     except (WebSocketDisconnect, RuntimeError):
         pass
     finally:
         session.subscribers.discard(q)
+
+
+class CameraRoleBody(BaseModel):
+    role: Literal["scan", "closed"]
+
+
+@app.post("/api/camera/role")
+async def camera_role(body: CameraRoleBody):
+    if session.state.value in ("RUNNING", "RECORDING"):
+        raise HTTPException(409, "stop before switching camera")
+    if session.scan_busy:
+        raise HTTPException(409, "scan in progress")
+    if session.camera is None:
+        raise HTTPException(400, "camera mode is not configured")
+    if body.role != "closed" and session.board_camera is not None and session.board_camera.camera.running:
+        raise HTTPException(409, "the markerless board camera is using the webcam; stop it first")
+    await guard(session.reserve_device, "camera transition")
+    try:
+        await session.camera.switch(body.role)
+        return session.camera.status()
+    finally:
+        session.release_device()
+
+
+class HardwareCalibrationBody(BaseModel):
+    action: Literal['wheel','translation','turn']
+    wheel: StrictInt = Field(default=0,ge=0,le=3)
+    duty: StrictInt = Field(ge=-200,le=200)
+    durationMs: StrictInt = Field(default=100,ge=1,le=250)
+    confirmed: StrictBool = False
+
+
+@app.post('/api/hardware/calibration')
+async def hardware_calibration(body: HardwareCalibrationBody):
+    from .hardware import load_profile
+    import uuid
+    if not body.confirmed or body.duty == 0:
+        raise HTTPException(400,'explicit one-shot confirmation and nonzero duty required')
+    try:
+        profile=load_profile()
+    except (OSError,ValueError) as e:
+        raise HTTPException(400,f'private hardware profile required: {e}')
+    if not profile.wiringVerified or not profile.motorRatingVerified:
+        raise HTTPException(409,'verify wiring, supply and motor specification before energizing outputs')
+    if body.action != 'wheel' and any(p is None for p in profile.polarity):
+        raise HTTPException(409,'measure and save each wheel polarity before movement trials')
+    if not hasattr(session.robot,'calibration'):
+        raise HTTPException(409,'calibration requires the physical robot adapter')
+    await guard(session.reserve_device,'hardware calibration pulse')
+    try:
+        ack = await guard(session.robot.calibration, {**body.model_dump(exclude={'confirmed'}),
+            'msgId':uuid.uuid4().hex,'polarity':profile.polarity})
+        return ack.__dict__
+    finally:
+        session.release_device()
+
+
+@app.get("/api/camera/image")
+def camera_image():
+    from fastapi.responses import Response
+    if session.camera is None:
+        raise HTTPException(400, "camera mode is not configured")
+    try:
+        return Response(session.camera.image(), media_type="image/jpeg", headers={"Cache-Control": "no-store"})
+    except ValueError as e:
+        raise HTTPException(503, str(e))
+
+
+@app.delete("/api/scan")
+async def clear_scan():
+    if session.state.value in ("RUNNING", "RECORDING") or session.scan_busy:
+        raise HTTPException(409, "stop before clearing scan")
+    session.scan = None
+    session.changed()
+    return {"ok": True}
+
+
+from .history_api import router as history_router
+app.include_router(history_router(lambda: session))
+from .intelligence_api import router as intelligence_router
+app.include_router(intelligence_router(lambda: session))
 
 
 # Serve the built frontend (npm run build) so one process runs the whole app.

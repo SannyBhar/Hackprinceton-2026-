@@ -8,7 +8,7 @@ plain projector.
 Architecture specification: [Grassroot](docs/Grassroot_Project_Architecture.md) ·
 Structural refactor: [brief](docs/Grassroot_Codex_Structural_Refactor.md) ·
 Current architecture: [module map](docs/ARCHITECTURE.md) · [refactor notes and checks](docs/REFACTOR_NOTES.md) ·
-Legacy scope: [CodeAnywhere_MVP_Scope.md](CodeAnywhere_MVP_Scope.md) · Plan: [docs/BUILD_PLAN.md](docs/BUILD_PLAN.md) ·
+Plan: [docs/BUILD_PLAN.md](docs/BUILD_PLAN.md) ·
 Defaults we chose: [docs/ASSUMPTIONS.md](docs/ASSUMPTIONS.md) · Projector setup: [docs/PROJECTION_SETUP.md](docs/PROJECTION_SETUP.md) ·
 Hardware: [docs/HARDWARE_CHECKLIST.md](docs/HARDWARE_CHECKLIST.md) · Overhead camera: [docs/CAMERA_SETUP.md](docs/CAMERA_SETUP.md)
 
@@ -17,7 +17,7 @@ Hardware: [docs/HARDWARE_CHECKLIST.md](docs/HARDWARE_CHECKLIST.md) · Overhead c
 One-time setup:
 
 ```bash
-python3 -m venv backend/.venv && backend/.venv/bin/pip install -r backend/requirements.txt
+python3.13 -m venv backend/.venv && backend/.venv/bin/pip install -r backend/requirements.txt
 ```
 
 ```bash
@@ -70,7 +70,7 @@ wrong-then-recover, boundary stop, tracking-loss stop, recording). Frontend: pro
 ```text
 backend/app/      models · grading · compiler · tracking · recording · session · main (FastAPI + WS)
   robot/          base protocol · simulator (robot + fake camera, fault injection) · esp32_ws (unverified)
-  vision/         cards (fixture + OpenCV/ArUco recognizers) · camera_tracker (unverified)
+  vision/         cards (fixture + OpenCV/ArUco recognizers) · coordinator (card-scanning webcam) · board_camera (markerless robot tracking)
 frontend/src/     api (types, REST, WS hook) · board (SVG renderer, themes) · calibration (homography)
                   projection (fullscreen warped view) · instructor (5 screens)
 firmware/esp32/   Arduino sketch: WS commands, bounded moves, STOP, heartbeat watchdog, msgId dedup
@@ -85,25 +85,60 @@ docs/             build plan, assumptions, projection setup, hardware checklist
 | --- | --- | --- |
 | `CA_ROBOT` | `sim` (default) / `esp32` | `CA_ROBOT_URL=ws://192.168.4.1:81/` |
 | `CA_CARDS` | `fixture` (default) / `opencv` | `CA_CARD_CAMERA=0`; needs `requirements-vision.txt` |
-| `CA_TRACKER` | unset / `camera` / `board-camera` | `CA_TRACK_CAMERA=1`; `camera` needs 4 physical corner markers, `board-camera` is markerless (see docs/CAMERA_SETUP.md) |
+| `CA_TRACKER` | unset / `camera` | `camera` starts markerless overhead tracking at launch on `CA_TRACK_CAMERA` (see docs/CAMERA_SETUP.md); it can also be started from Setup |
 
 **Status labels:** everything under "Tests" runs against the simulator. The ESP32 transport,
-firmware, OpenCV card reader and camera tracker are written but **not verified on hardware**.
+firmware and OpenCV card reader are written but **not verified on hardware**. Markerless camera tracking was verified on real frames of the board (static robot; see docs/CAMERA_SETUP.md).
 
 ## Configuration and refactor status
 
 Backend settings are assembled in `app/settings.py` and adapters in `app/dependencies.py`.
 Every `CA_*` variable above (plus `CA_DATA_DIR`) remains supported. Equivalent
 `GRASSROOT_*` variables take precedence; see `backend/settings.env.example`.
-Existing camera indices (scan 0, tracker 1) are retained for compatibility. The injected
-camera interface does **not** implement single-camera scheduling or handoff.
+One webcam is used either for card scanning or for markerless robot tracking, never both at once. SQLite is the default;
+OCR, USB continuous recording, cached Gemini artwork and local progress workflows are
+implemented in software. Physical verification remains pending.
 
-The current implementation uses JSON storage, discrete keyboard/gamepad recording,
-manual numeric review and static themes. OCR models, continuous joystick reconstruction,
-SQLite and AI providers are **not implemented** by this refactor. The supplied full product
-specification includes future work; it is not a claim of current functionality.
-
+Use the [Mac setup and calibration runbook](docs/MAC_HARDWARE_SETUP.md) for the confirmed
+XIAO boards, 22 cm grid, private Wi-Fi configuration and measured-motion gates.
 Additional verification: `npm --prefix frontend run typecheck` and
 `npm --prefix frontend run build`. No lint script or backend static type checker is configured.
-The baseline npm install reported **8 vulnerabilities (2 moderate, 4 high, 2 critical)**.
-Dependency upgrades are deferred; package manifests and lockfiles were not changed.
+See [dependency findings](docs/implementation/DEPENDENCIES.md); this stabilization does not upgrade dependencies.
+
+## Full implementation: three review phases
+
+See [Phase 1](docs/implementation/PHASE_1.md), [Phase 2](docs/implementation/PHASE_2.md),
+[Phase 3](docs/implementation/PHASE_3.md), and the [requirements/acceptance matrix](docs/implementation/ACCEPTANCE_MATRIX.md).
+These notes distinguish implemented software from still-pending physical acceptance.
+
+- **Storage:** SQLite is the default under the existing data directory. JSON import is
+  idempotent and preserves sources; see `sqlite_import_report.json`. `GRASSROOT_STORAGE=json`
+  retains the old adapter. Back up the whole data directory before migration.
+- **Hardware core:** install `backend/requirements-vision.txt`. Set `GRASSROOT_ROBOT=esp32`,
+  `GRASSROOT_CARDS=opencv`, `GRASSROOT_TRACKER=camera`, `GRASSROOT_CARD_CAMERA=0`. The one
+  webcam is used for card scanning, then closed and started as the overhead camera in Setup;
+  calibrate it from the projected test pattern (no markers needed). STOP is always visible.
+- **OCR:** optional `backend/requirements-ocr.txt`, `GRASSROOT_OCR=local`, writable `HF_HOME`.
+  Cache weights while online. Uncertain/unavailable recognition falls back to instructor input.
+- **Joystick:** optional `backend/requirements-joystick.txt`, `GRASSROOT_JOYSTICK_PORT`.
+  The second XIAO ESP32-S3 uses protocol-v2 USB serial: X GPIO1, Y GPIO2, button GPIO3, 3V3 power.
+- **Artwork:** install `backend/requirements-ai.txt`; configure backend `GEMINI_API_KEY` and
+  optionally `GRASSROOT_THEME_MODEL`. Never put a key in Vite settings. Themes & Progress
+  provides preview/accept/cancel/static fallback. Pre-cache before joining the robot AP if
+  that Wi-Fi connection has no internet.
+- **History/progress:** use local aliases in History; inspect/export attempts and approximate
+  recordings. Review warnings before loading generated programs. Recommendations never run
+  the robot; an instructor explicitly approves the next puzzle.
+- **Firmware:** `pip install platformio==6.1.18`, then `pio run -d firmware`. The default robot
+  outputs are disabled. `robot-calibration` allows instructor-confirmed one-shot pulses;
+  `robot-calibrated` requires the private measured hardware profile. See the runbook before upload.
+- **Browser tests:** `npm --prefix frontend run test:e2e` after Playwright Chromium installation.
+  Tests use an isolated simulator data directory and a built UI served by FastAPI.
+
+Physical testing, actual-card OCR accuracy and live Gemini acceptance are not implied by software test success.
+
+Frontend development now requires **Node >=22.12.0**. The Phase 3 dependency-maintenance commit
+updates affected tooling/router packages; the verified npm audit reports zero advisories.
+See [dependency notes](docs/implementation/DEPENDENCIES.md).
+
+Stabilization review: [changes, tests and completion gates](docs/implementation/STABILIZATION.md).

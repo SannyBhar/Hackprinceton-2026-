@@ -42,7 +42,7 @@ export function PuzzleEditor({ snap, onUse }: { snap: Snapshot; onUse: () => voi
   const shift = useRef(false);
   const paintMode = useRef<'add' | 'remove'>('add');
 
-  const refresh = useCallback(() => api.puzzles().then(setList).catch(() => {}), []);
+  const refresh = useCallback(() => api.puzzles().then(setList).catch(e => setError(e.message)), [setError]);
   useEffect(() => { refresh(); }, [refresh, snap.puzzle.id, snap.puzzle.version]);
   // Keep the active puzzle's draft in sync with the server when not editing it.
   useEffect(() => {

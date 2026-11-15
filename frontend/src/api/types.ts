@@ -43,6 +43,7 @@ export type ProjectorCalibration = {
   corners: Corner[]; viewportWidth: number; viewportHeight: number; markerMask: number; showGrid: boolean;
 };
 export type ProjectionSettings = {
+  artworkId?: string | null; artworkHash?: string | null;
   calibrating: boolean; testPattern: boolean; activeCorner: number; theme: string; showRobot: boolean;
 };
 
@@ -51,18 +52,29 @@ export type AttemptSummary = {
   reachedGoal: boolean; success: boolean; details: string[];
 };
 export type Attempt = {
+  source?: string;
   id: string; mode?: 'manual'; startedAt: number; endedAt?: number; puzzleId: string; puzzleVersion: number;
   program: Instruction[]; instructionIndex: number; events: VisitEvent[]; warnings: string[];
   stopReason: string | null; summary: AttemptSummary | null;
 };
 
+export type Student = { id: string; name: string; synthetic: boolean };
 export type Recording = {
+  id?: string; approximate?: boolean; mode?: string;
   actions: { action: Op; observedEntries: Cell[] }[];
   generated: Instruction[] | null; warnings: string[]; path: Cell[];
   startCell?: Cell; graded?: boolean;
 };
 
+/** Shared webcam used for card scanning (vision/coordinator.py). */
+export type CameraStatus = { role: string; error: string | null; resolution: number[] | null; timestampMs: number; index: number };
+
 export type Snapshot = {
+  studentId: string | null;
+  joystick: {active:boolean;error:string|null;connected?:boolean;armed?:boolean;fresh?:boolean;ageMs?:number|null;protocolVersion?:number|null;source?:string|null};
+  deviceOperation?: string | null;
+  sessionId: string;
+  camera: CameraStatus | null;
   seq: number;
   state: SessionState;
   puzzle: Puzzle;
@@ -75,7 +87,7 @@ export type Snapshot = {
   attemptHistory: Pick<Attempt, 'id' | 'startedAt' | 'stopReason' | 'summary'>[];
   tiles: Record<string, TileState>;
   pose: RobotPose | null;
-  robot: { adapter: string; connected: boolean };
+  robot: { adapter: string; connected: boolean; continuousSupported?: boolean; readiness?: {ready:boolean;mode?:string;error?:string|null;remainingCommands?:number;profileId?:string;outputsEnabled?:boolean;calibrated?:boolean} };
   recording: Recording;
   feed: { t: number; level: 'info' | 'warn' | 'error'; msg: string }[];
   poseSource: 'robot' | 'camera';
@@ -102,3 +114,8 @@ export type WsMessage =
 
 export const cellKey = (c: Cell) => `${c.row},${c.col}`;
 export const sameCell = (a: Cell, b: Cell) => a.row === b.row && a.col === b.col;
+
+export type ThemeJob = {id:string;status:string;themeText:string;error:string|null;url?:string;accepted:boolean;puzzleHash:string};
+export type SkillEstimate = {skill:string;estimate:number;evidenceCount:number;uncertain:boolean};
+export type ProgressReport = {studentId:string;synthetic:boolean;skills:SkillEstimate[];trend:{attemptId:string;startedAt:number;correct:number;entries:number}[];excludedOperationalOrUnattributed:number;limitations:string};
+export type Recommendation = {puzzle:Puzzle;skill:string;explanation:string;uncertain:boolean};

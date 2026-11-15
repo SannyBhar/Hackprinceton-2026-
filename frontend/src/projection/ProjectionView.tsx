@@ -18,6 +18,7 @@ export function ProjectionView() {
   const [vp, setVp] = useState({ w: window.innerWidth, h: window.innerHeight });
   const [drag, setDrag] = useState<Pt[] | null>(null);
   const [active, setActive] = useState(0);
+  const [saveError,setSaveError]=useState<string|null>(null);
   const [hint, setHint] = useState(true);
   const hideTimer = useRef<number>();
 
@@ -52,7 +53,7 @@ export function ProjectionView() {
       corners: pts.map(([x, y]) => ({ x: x / vp.w, y: y / vp.h })),
       viewportWidth: vp.w,
       viewportHeight: vp.h,
-    }).catch((e) => console.error(e));
+    }).then(()=>setSaveError(null)).catch((e) => setSaveError(e.message));
     setDrag(null);
   }, [cal, vp]);
 
@@ -69,7 +70,7 @@ export function ProjectionView() {
     if (!cal || !isFull) return;
     if (cal.viewportWidth === vp.w && cal.viewportHeight === vp.h) return;
     const t = window.setTimeout(() => {
-      api.saveCalibration({ ...cal, viewportWidth: vp.w, viewportHeight: vp.h }).catch(() => {});
+      api.saveCalibration({ ...cal, viewportWidth: vp.w, viewportHeight: vp.h }).then(()=>setSaveError(null)).catch(e=>setSaveError(e.message));
     }, 400); // wait for the fullscreen resize to settle
     return () => window.clearTimeout(t);
   }, [isFull, vp.w, vp.h, cal?.viewportWidth, cal?.viewportHeight]);
@@ -133,6 +134,7 @@ export function ProjectionView() {
           tiles={snap.tiles}
           pose={snap.pose}
           theme={ps.theme}
+          artworkUrl={ps.artworkId ? `/api/themes/${ps.artworkId}/image` : null}
           showGrid={cal.showGrid || ps.calibrating}
           showIndices={false}
           showRobot={false} // the real rover sits on the board; never project one
@@ -177,6 +179,7 @@ export function ProjectionView() {
       {!ps.calibrating && mismatch && (
         <div className="proj-corner-warn">Calibration was saved for a different output size — recalibrate.</div>
       )}
+      {saveError && <div className="proj-corner-warn">Calibration failed: {saveError}</div>}
       {!connected && <div className="proj-corner-warn">Reconnecting…</div>}
       {hint && !ps.calibrating && !document.fullscreenElement && (
         <button className="proj-fs" onClick={() => document.documentElement.requestFullscreen()}>

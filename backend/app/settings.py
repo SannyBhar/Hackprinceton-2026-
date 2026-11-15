@@ -15,6 +15,10 @@ def env_value(name: str, default: str, env: Mapping[str, str] | None = None) -> 
 
 @dataclass(frozen=True)
 class Settings:
+    camera_index: int = 0
+    storage: str = "sqlite"
+    ocr: bool = False
+    joystick_port: str = ""
     robot: str = "sim"
     robot_url: str = "ws://192.168.4.1:81/"
     cards: str = "fixture"
@@ -28,8 +32,9 @@ class Settings:
         def get(key: str, default: str) -> str:
             return env_value(key, default, env)
         cards, tracker = get("CARDS", "fixture"), get("TRACKER", "sim")
-        return cls(robot=get("ROBOT", "sim"), robot_url=get("ROBOT_URL", "ws://192.168.4.1:81/"),
+        return cls(camera_index=int(get("CAMERA", get("CARD_CAMERA",get("TRACK_CAMERA","0")))), storage=get("STORAGE", "sqlite"), ocr=get("OCR", "manual") == "local",
+                   joystick_port=get("JOYSTICK_PORT", ""), robot=get("ROBOT", "sim"), robot_url=get("ROBOT_URL", "ws://192.168.4.1:81/"),
                    cards=cards, tracker=tracker,
-                   card_camera=int(get("CARD_CAMERA", "0")) if cards == "opencv" else 0,
+                   card_camera=int(get("CARD_CAMERA", "0")) if cards == "opencv" else int(get("CAMERA", "0")),
                    track_camera=int(get("TRACK_CAMERA", "1")) if tracker in ("camera", "board-camera") else 1,
                    data_dir=Path(get("DATA_DIR", str(ROOT / "data"))))

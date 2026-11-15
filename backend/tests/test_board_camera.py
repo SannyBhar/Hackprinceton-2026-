@@ -115,3 +115,53 @@ async def test_hand_push_test_not_stopped_by_hidden_robot(session):
     assert session.state == SessionState.RUNNING
     await session.operational_stop(__import__("app.models", fromlist=["StopReason"]).StopReason.INSTRUCTOR_STOP)
     assert session.state == SessionState.STOPPED
+
+
+# --------------------------------------------------------------------------- merge with upstream camera
+def test_board_camera_migrates_only_its_own_legacy_calibration(tmp_path):
+    import json
+    from app.vision.board_camera import BoardCamera
+    legacy = tmp_path / "camera_calibration.json"
+    get_board = lambda: (7, 7, 0.35, "N")
+    # The marker-based coordinator's file (has 'homography') must never be adopted.
+    legacy.write_text(json.dumps({"homography": [[1, 0, 0], [0, 1, 0], [0, 0, 1]], "index": 0}))
+    assert BoardCamera(get_board, lambda p: None, tmp_path).calibration is None
+    # An older markerless calibration is migrated to the board camera's own file.
+    legacy.write_text(json.dumps({"cameraIndex": 0, "imageWidth": 1920, "imageHeight": 1080,
+                                  "corners": [[410, 428], [1427, 434], [1654, 1020], [198, 1043]]}))
+    cam = BoardCamera(get_board, lambda p: None, tmp_path)
+    assert cam.calibration is not None and (tmp_path / "board_camera_calibration.json").exists()
+
+
+def test_only_one_camera_system_may_hold_the_webcam(tmp_path, monkeypatch):
+    pytest.importorskip("cv2")
+    from types import SimpleNamespace
+    from fastapi.testclient import TestClient
+    monkeypatch.setenv("GRASSROOT_DATA_DIR", str(tmp_path))
+    from app import main
+    with TestClient(main.app) as c:
+        main.session.camera = SimpleNamespace(role="scan")      # coordinator holds the webcam
+        r = c.post("/api/board-camera/start", json={"index": 0})
+        assert r.status_code == 409 and "shared webcam" in r.json()["detail"]
+        main.session.camera = None
+
+
+def test_tracker_autostart_skips_when_card_scanner_holds_webcam(tmp_path):
+    from types import SimpleNamespace
+    from app.dependencies import build_board_camera
+    from app.settings import Settings
+    started = []
+    s = SimpleNamespace(puzzle=SimpleNamespace(rows=7, cols=7, startHeading="N"),
+                        calibration=SimpleNamespace(markerMask=0.35), camera_pose=lambda p: None,
+                        camera=SimpleNamespace(role="scan"), pose_source="robot")
+    from app.vision import board_camera
+    orig = board_camera.BoardCamera.start_camera
+    board_camera.BoardCamera.start_camera = lambda self, i: started.append(i)
+    try:
+        build_board_camera(s, Settings(tracker="camera", track_camera=0, data_dir=tmp_path))
+        assert started == [] and s.pose_source == "robot"      # scanner keeps the webcam
+        s.camera = None
+        build_board_camera(s, Settings(tracker="camera", track_camera=0, data_dir=tmp_path))
+        assert started == [0] and s.pose_source == "camera"
+    finally:
+        board_camera.BoardCamera.start_camera = orig

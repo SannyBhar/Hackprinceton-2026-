@@ -80,7 +80,7 @@ export function LiveTab({ snap }: { snap: Snapshot }) {
       }
       right={
         <BoardCard title={snap.puzzle.name} footer={<FeedbackLegend />}>
-          <Board puzzle={snap.puzzle} tiles={snap.tiles} pose={snap.pose} theme={snap.projection.theme} width="100%" height="auto" />
+          <Board puzzle={snap.puzzle} tiles={snap.tiles} pose={snap.pose} theme={snap.projection.theme} artworkUrl={snap.projection.artworkId ? `/api/themes/${snap.projection.artworkId}/image` : null} width="100%" height="auto" />
         </BoardCard>
       }
     />
