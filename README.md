@@ -1,6 +1,9 @@
 # Grassroot
 
-Physical-card coding robot for grades 2–4. Students lay out ArUco coding cards; the instructor
+Physical-card coding robot for grades 2–4.
+
+**Current cards:** [2-inch unit movement blocks](docs/UNIT_BLOCKS.md), ArUco `DICT_4X4_1000`: 0 forward, 1 backward, 2 right, 3 left. Each forward/backward block moves one cell; repeat blocks for longer movement. No handwritten distances.
+ Students lay out ArUco coding cards; the instructor
 webapp scans them, runs the robot on a physical grid, tracks it with an overhead camera, grades
 each cell entry against an ordered target route, and projects live feedback onto the board via a
 plain projector.
@@ -57,13 +60,12 @@ wrong-then-recover, boundary stop, tracking-loss stop, recording). Frontend: pro
 ## 2-minute demo script (simulator)
 
 1. **Setup** → *Calibrate corners*: drag the 4 handles on the projection window; toggle *Test pattern*.
-2. **Program / Scan** → *Scan cards* (plays `fixtures/scans/01_*`): one card is low-confidence and
-   must be ticked; *Confirm program* → *Run ▶*. All 7 tiles go green.
-3. *Scan cards* again (buggy fixture): FORWARD is unreadable — type `1` and review. Run: tiles go
+2. **Program / Scan** → *Scan cards* (plays `fixtures/scans/01_*`): review the blocks and their order; *Confirm program* → *Run ▶*. All 7 tiles go green.
+3. *Scan cards* again (buggy fixture): review the repeated movement blocks. Run: tiles go
    ✓ ✓ ✗ ✗ ✗ ✓ ✓ — wrong entries don't stop the robot and the later same-index match is green.
 4. **Setup** → *Drift left*, run again → operational **BOUNDARY** stop, shown distinctly from mistakes.
 5. **Puzzle Editor** → load *Peek and Return* for revisits/split tiles. **Joystick Recording** →
-   arrows/Space or a gamepad; Stop generates `START, FORWARD 2, RIGHT, …, STOP`.
+   arrows/Space or a gamepad; Stop generates `START, FORWARD, FORWARD, RIGHT, …, STOP`.
 
 ## Layout
 
@@ -96,7 +98,7 @@ Backend settings are assembled in `app/settings.py` and adapters in `app/depende
 Every `CA_*` variable above (plus `CA_DATA_DIR`) remains supported. Equivalent
 `GRASSROOT_*` variables take precedence; see `backend/settings.env.example`.
 One webcam is used either for card scanning or for markerless robot tracking, never both at once. SQLite is the default;
-OCR, USB continuous recording, cached Gemini artwork and local progress workflows are
+USB continuous recording, cached Gemini artwork and local progress workflows are
 implemented in software. Physical verification remains pending.
 
 Use the [Mac setup and calibration runbook](docs/MAC_HARDWARE_SETUP.md) for the confirmed
@@ -118,8 +120,7 @@ These notes distinguish implemented software from still-pending physical accepta
   `GRASSROOT_CARDS=opencv`, `GRASSROOT_TRACKER=camera`, `GRASSROOT_CARD_CAMERA=0`. The one
   webcam is used for card scanning, then closed and started as the overhead camera in Setup;
   calibrate it from the projected test pattern (no markers needed). STOP is always visible.
-- **OCR:** optional `backend/requirements-ocr.txt`, `GRASSROOT_OCR=local`, writable `HF_HOME`.
-  Cache weights while online. Uncertain/unavailable recognition falls back to instructor input.
+- **Movement cards:** use the supplied 2-inch IDs 0/1/2/3; physical scans use one-cell blocks and no OCR. Older numeric histories remain readable. See the unit-block printing guide above.
 - **Joystick:** optional `backend/requirements-joystick.txt`, `GRASSROOT_JOYSTICK_PORT`.
   The second XIAO ESP32-S3 uses protocol-v2 USB serial: X GPIO1, Y GPIO2, button GPIO3, 3V3 power.
 - **Artwork:** install `backend/requirements-ai.txt`; configure backend `GEMINI_API_KEY` and
@@ -135,7 +136,7 @@ These notes distinguish implemented software from still-pending physical accepta
 - **Browser tests:** `npm --prefix frontend run test:e2e` after Playwright Chromium installation.
   Tests use an isolated simulator data directory and a built UI served by FastAPI.
 
-Physical testing, actual-card OCR accuracy and live Gemini acceptance are not implied by software test success.
+Physical printing/camera testing and live Gemini acceptance are not implied by software test success.
 
 Frontend development now requires **Node >=22.12.0**. The Phase 3 dependency-maintenance commit
 updates affected tooling/router packages; the verified npm audit reports zero advisories.

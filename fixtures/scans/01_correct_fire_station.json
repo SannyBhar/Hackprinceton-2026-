@@ -1,10 +1,72 @@
-{"note": "Correct program for fire-station; second number is low-confidence handwriting.",
- "cards": [
-  {"order": 0, "cardId": 10, "op": "START"},
-  {"order": 1, "cardId": 20, "op": "FORWARD", "rawSteps": 2, "stepsConfidence": 0.97},
-  {"order": 2, "cardId": 70, "op": "RIGHT"},
-  {"order": 3, "cardId": 21, "op": "FORWARD", "rawSteps": 3, "stepsConfidence": 0.62},
-  {"order": 4, "cardId": 60, "op": "LEFT"},
-  {"order": 5, "cardId": 22, "op": "FORWARD", "rawSteps": 2, "stepsConfidence": 0.95},
-  {"order": 6, "cardId": 80, "op": "STOP"}
- ]}
+{
+  "note": "Unit blocks: one translation cell per repeated physical marker; instructor reviews order.",
+  "cards": [
+    {
+      "order": 0,
+      "cardId": 10,
+      "op": "START",
+      "rawSteps": null
+    },
+    {
+      "order": 1,
+      "cardId": 0,
+      "op": "FORWARD",
+      "rawSteps": 1
+    },
+    {
+      "order": 2,
+      "cardId": 0,
+      "op": "FORWARD",
+      "rawSteps": 1
+    },
+    {
+      "order": 3,
+      "cardId": 2,
+      "op": "RIGHT",
+      "rawSteps": null
+    },
+    {
+      "order": 4,
+      "cardId": 0,
+      "op": "FORWARD",
+      "rawSteps": 1
+    },
+    {
+      "order": 5,
+      "cardId": 0,
+      "op": "FORWARD",
+      "rawSteps": 1
+    },
+    {
+      "order": 6,
+      "cardId": 0,
+      "op": "FORWARD",
+      "rawSteps": 1
+    },
+    {
+      "order": 7,
+      "cardId": 3,
+      "op": "LEFT",
+      "rawSteps": null
+    },
+    {
+      "order": 8,
+      "cardId": 0,
+      "op": "FORWARD",
+      "rawSteps": 1
+    },
+    {
+      "order": 9,
+      "cardId": 0,
+      "op": "FORWARD",
+      "rawSteps": 1
+    },
+    {
+      "order": 10,
+      "cardId": 80,
+      "op": "STOP",
+      "rawSteps": null
+    }
+  ],
+  "unitBlocks": true
+}
