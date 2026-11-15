@@ -67,7 +67,7 @@ def save_puzzle_only(p: Puzzle):
     """Save to the library without activating (allowed even while running)."""
     if p.id == session.puzzle.id:
         raise HTTPException(409, "this puzzle is active; use 'Save & use' instead")
-    session.storage.save_puzzle(p)
+    p = session.storage.save_puzzle(p)
     return p.model_dump(mode="json")
 
 
@@ -83,6 +83,10 @@ def delete_puzzle(puzzle_id: str):
 
 @app.put("/api/puzzle")
 async def put_puzzle(p: Puzzle):
+    if session.state.value in ("RUNNING","RECORDING"):
+        raise HTTPException(409,"stop before changing puzzle")
+    # Reserve the persisted revision off-loop; recheck live state in set_puzzle.
+    p = await asyncio.to_thread(session.storage.save_puzzle,p)
     await guard(session.set_puzzle, p)
     return session.puzzle.model_dump(mode="json")
 

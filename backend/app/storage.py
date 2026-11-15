@@ -53,8 +53,12 @@ class Storage:
         f.unlink()
         return "reverted" if self.is_builtin(puzzle_id) else "deleted"
 
-    def save_puzzle(self, p: Puzzle) -> None:
+    def save_puzzle(self, p: Puzzle) -> Puzzle:
+        existing = next((old for old in self.list_puzzles() if old.id == p.id), None)
+        if existing and existing != p and p.version <= existing.version:
+            p = p.model_copy(update={"version":existing.version+1})
         self._write(self.dir / "puzzles" / f"{p.id}.json", p.model_dump(mode="json"))
+        return p
 
     def load_calibration(self) -> Optional[ProjectorCalibration]:
         f = self.dir / "projector_calibration.json"

@@ -12,7 +12,7 @@ to an earlier completed pass; this implementation follows the approved full-proj
 | Phase 1 firmware | Robot PlatformIO build passed (disabled outputs) |
 | Phase 2 backend / frontend | 55 / 8 passed; build/typecheck passed |
 | Phase 2 firmware | Robot + joystick PlatformIO builds passed |
-| Phase 3 backend | 63 passed after final hardening |
+| Phase 3 backend | 64 passed after final hardening |
 | Phase 3 frontend | 8 passed; build/typecheck passed |
 | Browser workflows | 3 passed, including provider-failure fixture; Chromium ran outside sandbox |
 | Local model | TrOCR loaded and inferred real output on synthetic crop; ambiguous output correctly rejected |
@@ -34,3 +34,5 @@ Final audit after separate frontend maintenance: 0 npm vulnerabilities. Backend 
 relative-import graph checks passed (no Python/TypeScript relative-import cycles). Final firmware
 robot/joystick builds passed. Node >=22.12.0 now required; verified Node 24.4.1. No tests left
 failing in the final software suite. Physical/live-provider gates remain explicitly incomplete.
+
+Final versioning regression: inactive library edits now allocate canonical increasing revisions in SQLite transactions; historical revision bodies remain immutable. Repository.save_puzzle returns the canonical Puzzle; callers that ignored its prior return remain compatible.
