@@ -16,6 +16,10 @@
 #include <WiFi.h>
 #include <WebSocketsServer.h>
 #include <ArduinoJson.h>
+#include "hardware_pins.h"
+#ifndef GRASSROOT_WIRING_VERIFIED
+#define GRASSROOT_WIRING_VERIFIED 0
+#endif
 
 // ---------- network (ESP32 runs its own access point; laptop joins it) ----------
 const char* AP_SSID = "codeanywhere-robot";
@@ -26,8 +30,16 @@ WebSocketsServer ws(81);
 // Reference only for now: active pins stay disabled; no motor integration in this change.
 // ---------- motor driver pins: TODO confirm (two DRV8833 = 4 H-bridges) ----------
 // Order: front-left, front-right, rear-left, rear-right. Each motor uses IN1/IN2 PWM.
-const int MOTOR_IN1[4] = {-1, -1, -1, -1};  // TODO
-const int MOTOR_IN2[4] = {-1, -1, -1, -1};  // TODO
+#if GRASSROOT_WIRING_VERIFIED
+using namespace grassroot_hardware;
+const int MOTOR_IN1[4] = {LF_IN1, RF_IN1, LR_IN1, RR_IN1};
+const int MOTOR_IN2[4] = {LF_IN2, RF_IN2, LR_IN2, RR_IN2};
+#else
+const int MOTOR_IN1[4] = {-1, -1, -1, -1};
+const int MOTOR_IN2[4] = {-1, -1, -1, -1};
+#endif
+// Sketch order LF, RF, LR, RR. Verify one wheel at a time before changing polarity.
+const int MOTOR_POLARITY[4] = {1, 1, 1, 1};
 const int PWM_FREQ = 20000, PWM_BITS = 8;
 
 // ---------- movement calibration (measure on the real board!) ----------
@@ -48,6 +60,7 @@ void remember(const String& id) { recentIds[recentHead] = id; recentHead = (rece
 
 void setMotor(int i, int duty) {   // duty -255..255
   if (MOTOR_IN1[i] < 0) return;    // pins not configured: refuse to drive
+  duty = constrain(duty * MOTOR_POLARITY[i], -200, 200);
   int a = duty > 0 ? duty : 0, b = duty < 0 ? -duty : 0;
   analogWrite(MOTOR_IN1[i], a);
   analogWrite(MOTOR_IN2[i], b);
@@ -72,9 +85,22 @@ void handleCmd(uint8_t client, JsonDocument& d) {
   String kind = d["kind"] | "";
   int value = d["value"] | 0;
   if (kind == "STOP") { finishMotion("STOPPED"); sendAck(client, msgId, "DONE"); return; }
+  if (msgId.length() == 0 || msgId.length() > 64) {
+    finishMotion("STOPPED"); sendAck(client, msgId, "ERROR", "invalid msgId"); return;
+  }
+  if (!GRASSROOT_WIRING_VERIFIED) {
+    sendAck(client, msgId, "ERROR", "wiring not verified; outputs disabled"); return;
+  }
   if (seen(msgId)) { sendAck(client, msgId, "DUPLICATE"); return; }
-  remember(msgId);
   if (motion.active) { sendAck(client, msgId, "ERROR", "busy"); return; }
+  if ((kind == "MOVE" && (value == 0 || abs(value) > 5)) ||
+      (kind == "TURN" && value != 90 && value != -90) ||
+      (kind != "MOVE" && kind != "TURN")) {
+    finishMotion("STOPPED"); sendAck(client, msgId, "ERROR", "invalid primitive"); return;
+  }
+  uint32_t planned = kind == "MOVE" ? (uint32_t)(abs(value) * MS_PER_CELL) : (uint32_t)MS_PER_90;
+  if (planned > MAX_COMMAND_MS) { sendAck(client, msgId, "ERROR", "duration exceeds bound"); return; }
+  remember(msgId);
   uint32_t dur;
   if (kind == "MOVE") {
     dur = (uint32_t)(abs(value) * MS_PER_CELL);
@@ -92,10 +118,11 @@ void onWs(uint8_t client, WStype_t type, uint8_t* payload, size_t len) {
   if (type == WStype_DISCONNECTED) { finishMotion("STOPPED"); return; }
   if (type != WStype_TEXT) return;
   JsonDocument d;
-  if (deserializeJson(d, payload, len)) return;
+  if (deserializeJson(d, payload, len)) { finishMotion("STOPPED"); return; }
   String t = d["type"] | "";
   if (t == "hb") lastHeartbeat = millis();
   else if (t == "cmd") { lastHeartbeat = millis(); handleCmd(client, d); }
+  else { finishMotion("STOPPED"); }
 }
 
 void setup() {

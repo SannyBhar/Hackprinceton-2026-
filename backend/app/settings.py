@@ -30,6 +30,6 @@ class Settings:
         cards, tracker = get("CARDS", "fixture"), get("TRACKER", "sim")
         return cls(robot=get("ROBOT", "sim"), robot_url=get("ROBOT_URL", "ws://192.168.4.1:81/"),
                    cards=cards, tracker=tracker,
-                   card_camera=int(get("CARD_CAMERA", "0")) if cards == "opencv" else 0,
+                   card_camera=int(get("CARD_CAMERA", "0")) if cards == "opencv" else int(get("CAMERA", "0")),
                    track_camera=int(get("TRACK_CAMERA", "1")) if tracker == "camera" else 1,
                    data_dir=Path(get("DATA_DIR", str(ROOT / "data"))))

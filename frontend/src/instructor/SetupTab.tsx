@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { api } from '../api/client';
 import type { Corner, Snapshot } from '../api/types';
 import { Board } from '../board/Board';
@@ -34,6 +34,17 @@ export function SetupTab({ snap }: { snap: Snapshot }) {
     <TwoCol
       left={
         <>
+          {snap.camera && <Card title="Shared webcam" subtitle={`${snap.camera.role} · ${snap.camera.ready ? 'ready' : 'not ready'}`}>
+            <div className="row">
+              <button disabled={moving} onClick={() => run(() => api.cameraRole('scan'))}>Scan camera</button>
+              <button disabled={moving} onClick={() => run(() => api.cameraRole('track'))}>Arena tracking</button>
+              <button disabled={moving} onClick={() => run(() => api.calibrateCamera())}>Validate camera calibration</button>
+              <button disabled={moving} onClick={() => run(() => api.cameraRole('closed'))}>Close camera</button>
+            </div>
+            <p>After scanning, return the camera to the arena. Show all four corner markers and the robot marker, then validate. Any repositioning requires revalidation.</p>
+            <CameraPreview />
+            {snap.camera.error && <div className="error">{snap.camera.error}</div>}
+          </Card>}
           <Card step="1" title="Projector window"
                 subtitle="Open it, drag it to the projector display, press F for fullscreen.">
             <div className="row">
@@ -128,4 +139,13 @@ export function SetupTab({ snap }: { snap: Snapshot }) {
       }
     />
   );
+}
+
+function CameraPreview() {
+  const [image, setImage] = useState('');
+  useEffect(() => {
+    const timer = window.setInterval(() => setImage(`/api/camera/image?t=${Date.now()}`), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+  return image ? <img alt="Shared webcam preview" src={image} style={{ width: '100%' }} /> : null;
 }

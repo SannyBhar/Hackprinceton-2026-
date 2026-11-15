@@ -11,11 +11,21 @@ async def running_session(session: Session):
     tracker_task = None
     try:
         await session.start()
-        tracker = build_tracker(session, Settings.from_env())
-        if tracker is not None:
-            tracker_task = asyncio.create_task(tracker.run())
+        cfg = Settings.from_env()
+        if cfg.cards == "opencv" or cfg.tracker == "camera":
+            from .vision.coordinator import CameraCoordinator
+            session.camera = CameraCoordinator(session, cfg.card_camera, cfg.data_dir)
+            if session.robot.name == "simulator":
+                session.robot.on_pose = None  # physical camera is the exclusive pose source
+            await session.camera.switch("scan")
+        else:
+            tracker = build_tracker(session, cfg)
+            if tracker is not None:
+                tracker_task = asyncio.create_task(tracker.run())
         yield
     finally:
+        if session.camera:
+            await session.camera.close()
         if tracker_task is not None:
             tracker_task.cancel()
             await asyncio.gather(tracker_task, return_exceptions=True)

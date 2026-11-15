@@ -33,12 +33,20 @@ class Storage:
                 out[p.id] = p
         return list(out.values())
 
+    def list_library(self) -> list[dict]:
+        return [{**p.model_dump(mode="json"), "builtin": self.is_builtin(p.id),
+                 "edited": (self.dir / "puzzles" / f"{p.id}.json").exists()}
+                for p in self.list_puzzles()]
+
     def is_builtin(self, puzzle_id: str) -> bool:
         return any(Puzzle.model_validate_json(f.read_text()).id == puzzle_id
                    for f in (FIXTURES / "puzzles").glob("*.json"))
 
     def delete_puzzle(self, puzzle_id: str) -> str:
         """Remove a user puzzle. For a bundled example this only reverts local edits."""
+        import re
+        if not re.fullmatch(r"[A-Za-z0-9_-]{1,80}", puzzle_id):
+            return "missing"
         f = self.dir / "puzzles" / f"{puzzle_id}.json"
         if not f.exists():
             return "missing"

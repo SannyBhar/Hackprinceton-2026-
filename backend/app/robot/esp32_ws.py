@@ -75,16 +75,22 @@ class Esp32WebSocketRobot:
             await asyncio.sleep(0.25)
 
     async def execute(self, p: Primitive) -> Ack:
+        if p.msgId in self._pending:
+            return await asyncio.shield(self._pending[p.msgId])
         if not self._ws:
             return Ack(p.msgId, "ERROR", "robot not connected")
         fut = asyncio.get_running_loop().create_future()
         self._pending[p.msgId] = fut
-        await self._ws.send(json.dumps({"type": "cmd", **p.to_dict()}))
         try:
+            await self._ws.send(json.dumps({"type": "cmd", **p.to_dict()}))
             return await asyncio.wait_for(fut, self.ack_timeout_s)
         except asyncio.TimeoutError:
             await self.stop("ack timeout")
             return Ack(p.msgId, "ERROR", "ack timeout")
+        except Exception as e:
+            return Ack(p.msgId, "ERROR", str(e))
+        finally:
+            self._pending.pop(p.msgId, None)
 
     async def stop(self, reason: str) -> None:
         if self._ws:

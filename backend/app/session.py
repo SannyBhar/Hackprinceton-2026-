@@ -4,6 +4,8 @@ from __future__ import annotations
 import asyncio
 import time
 import uuid
+import math
+import copy
 from typing import Any, Optional
 
 from .compiler import DEFAULT_MAX_STEPS, PlanResult, plan
@@ -72,6 +74,10 @@ class Session:
         self._run_task: Optional[asyncio.Task] = None
         self._stop_reason: Optional[StopReason] = None
 
+        self.camera = None
+        self.scan_busy = False
+        self.session_id = uuid.uuid4().hex
+        self._io_tasks: set[asyncio.Task] = set()
         self.seq = 0
         self.subscribers: set[asyncio.Queue] = set()
         self.robot.on_pose = self.on_pose
@@ -84,6 +90,9 @@ class Session:
         self._bg = [asyncio.create_task(self._watchdog())]
 
     async def close(self):
+        await self.robot.stop("application shutdown")
+        if self._io_tasks:
+            await asyncio.gather(*self._io_tasks, return_exceptions=True)
         tasks = self._bg + ([self._run_task] if self._run_task else [])
         for t in tasks:
             t.cancel()
@@ -110,6 +119,8 @@ class Session:
     def snapshot(self) -> dict:
         tiles = {k: reduce_tile(h, self.tile_policy).to_dict() for k, h in self.tile_history.items()}
         return {
+            "sessionId": self.session_id,
+            "camera": self.camera.status() if self.camera else None,
             "seq": self.seq,
             "state": self.state.value,
             "puzzle": self.puzzle.model_dump(mode="json"),
@@ -140,6 +151,8 @@ class Session:
                       action="change puzzle")
         if p.id == self.puzzle.id and p != self.puzzle:
             p = p.model_copy(update={"version": max(p.version, self.puzzle.version + 1)})
+        if self.camera and (p.rows, p.cols) != (self.puzzle.rows, self.puzzle.cols):
+            self.camera.invalidate()
         self.puzzle = p
         self.storage.save_puzzle(p)
         self._clear_feedback()
@@ -161,10 +174,37 @@ class Session:
         self.changed()
 
     def set_projection(self, ps: ProjectionSettings):
+        if self.state in (S.RUNNING, S.RECORDING) and (ps.theme != self.projection.theme or ps.calibrating):
+            raise ConflictError("theme and calibration changes require stopped motors")
         self.projection = ps  # display-only toggles; allowed any time
         self.changed()
 
     # ------------------------------------------------------------------ scanning / program
+    async def scan_async(self, image: Optional[bytes] = None) -> ScanResult:
+        self._require(S.IDLE, S.SCANNING, S.PROGRAM_READY, S.COMPLETED, S.STOPPED, action="scan")
+        if self.scan_busy:
+            raise ConflictError("scan already in progress")
+        self.scan_busy = True
+        self.state = S.SCANNING
+        self.program, self.plan = None, None
+        self.changed()
+        try:
+            if self.camera:
+                if self.camera.role != "scan":
+                    raise ConflictError("switch camera to scan role first")
+                image = image or self.camera.image()
+            result = await asyncio.to_thread(self.recognizer.scan, image)
+            self.scan = result
+            return result
+        except ConflictError:
+            raise
+        except Exception as e:
+            self.scan = ScanResult(scanId=uuid.uuid4().hex, source=self.recognizer.name, cards=[], errors=[str(e)])
+            return self.scan
+        finally:
+            self.scan_busy = False
+            self.changed()
+
     def do_scan(self, image: Optional[bytes] = None) -> ScanResult:
         self._require(S.IDLE, S.SCANNING, S.PROGRAM_READY, S.COMPLETED, S.STOPPED,
                       action="scan cards")
@@ -178,9 +218,16 @@ class Session:
         self.changed()
         return self.scan
 
-    def confirm_program(self, program: list[Instruction]) -> PlanResult:
+    def confirm_program(self, program: list[Instruction], scan_id: str | None = None, reviewed: bool = False) -> PlanResult:
         self._require(S.IDLE, S.SCANNING, S.PROGRAM_READY, S.COMPLETED, S.STOPPED,
                       action="confirm a program")
+        if self.scan_busy:
+            raise ConflictError("wait for scan to finish")
+        if self.scan is not None:
+            if scan_id != self.scan.scanId or not reviewed:
+                raise InvalidError("review the current scan and confirm its scanId")
+            if not self.scan.cards or self.scan.errors:
+                raise InvalidError("scan is invalid; rescan or explicitly clear it for manual programming")
         result = plan(self.puzzle, program, self.max_steps)
         if not result.ok:
             raise InvalidError("; ".join(result.errors))
@@ -203,9 +250,13 @@ class Session:
 
     def _check_start_pose(self):
         p = self.pose
-        if p is None or not p.trackingValid:
+        if self.scan_busy:
+            raise ConflictError("scan is in progress")
+        if self.camera and not self.camera.ready():
+            raise ConflictError("arena camera calibration and tracking must be ready")
+        if p is None or not p.trackingValid or not 0 <= now_ms() - p.timestampMs <= self.tracker_cfg.stale_ms:
             raise ConflictError("robot pose not observed; cannot confirm start position")
-        cell = Cell(row=int(p.y), col=int(p.x))
+        cell = Cell(row=math.floor(p.y), col=math.floor(p.x))
         if cell != self.puzzle.startCell:
             raise ConflictError(f"robot is at {cell.key()}, not at start {self.puzzle.startCell.key()}")
         diff = abs((p.headingDeg - HEADING_DEG[self.puzzle.startHeading] + 180) % 360 - 180)
@@ -235,7 +286,7 @@ class Session:
         self.state = S.RUNNING
         self.log("info", f"run {attempt_id} started")
         self.changed()
-        self._run_task = asyncio.create_task(self._execute(attempt_id, list(self.program)))
+        self._run_task = asyncio.create_task(self._execute(attempt_id, copy.deepcopy(self.program)))
 
     async def _execute(self, run_id: str, program: list[Instruction]):
         try:
@@ -262,6 +313,13 @@ class Session:
                 if ack.status == "STOPPED":
                     break
             await asyncio.sleep(0.4)  # let the final pose settle into the last cell
+        except asyncio.CancelledError:
+            self._stop_reason = self._stop_reason or StopReason.INSTRUCTOR_STOP
+            raise
+        except Exception as e:
+            self._stop_reason = self._stop_reason or StopReason.ROBOT_FAULT
+            self.log("error", f"execution fault: {e}")
+            await self.robot.stop("execution fault")
         finally:
             self._finish(self._stop_reason or StopReason.PROGRAM_COMPLETE)
 
@@ -277,10 +335,16 @@ class Session:
                       S.FAULT if reason in (StopReason.ROBOT_FAULT, StopReason.CONNECTION_LOST) else
                       S.STOPPED)
         self.attempt_history.append(dict(self.attempt))
-        try:
-            self.storage.save_attempt(self.attempt["id"], self.attempt)
-        except OSError as e:
-            self.log("warn", f"could not save attempt: {e}")
+        record = copy.deepcopy(self.attempt)
+        async def persist():
+            try:
+                await asyncio.to_thread(self.storage.save_attempt, record["id"], record)
+            except Exception as e:
+                self.log("warn", f"could not save attempt: {e}")
+                self.changed()
+        task = asyncio.create_task(persist())
+        self._io_tasks.add(task)
+        task.add_done_callback(self._io_tasks.discard)
         self.log("info" if normal else "warn",
                  f"run ended: {reason.value}{' — SUCCESS' if s.success else ''}")
         self.changed()
@@ -316,7 +380,9 @@ class Session:
                 self.log("warn", w)
                 if self.attempt:
                     self.attempt["warnings"].append(w)
-            if out.entered:
+            if out.skipped:
+                asyncio.create_task(self.operational_stop(StopReason.TRACKING_UNCERTAIN))
+            elif out.entered:
                 self._on_entry(out.entered, pose.timestampMs)
             if out.boundary:
                 asyncio.get_event_loop().create_task(self.operational_stop(StopReason.BOUNDARY))
@@ -357,9 +423,10 @@ class Session:
             await self._end_recording()
             return
         self._require(S.IDLE, S.PROGRAM_READY, S.COMPLETED, S.STOPPED, action="start recording")
+        self._check_start_pose()
         self._clear_feedback()
         p = self.pose
-        start = (Cell(row=int(p.y), col=int(p.x)) if p and p.trackingValid else self.puzzle.startCell)
+        start = (Cell(row=math.floor(p.y), col=math.floor(p.x)) if p and p.trackingValid else self.puzzle.startCell)
         self.detector = CellEntryDetector(self.puzzle.rows, self.puzzle.cols, start, self.tracker_cfg)
         self.detector.last_valid_ms = t
         if grade:

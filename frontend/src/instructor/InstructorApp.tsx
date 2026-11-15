@@ -26,7 +26,7 @@ export function InstructorApp() {
   if (!snap) {
     return <div className="loading">Connecting to the Grassroot backend… (is it running on :8000?)</div>;
   }
-  const moving = snap.state === 'RUNNING' || snap.state === 'RECORDING';
+  
 
   return (
     <div className="app">
@@ -44,7 +44,7 @@ export function InstructorApp() {
           Rover · {snap.robot.adapter}</span>
         <span className="chip"><span className={`dot ${connected ? 'ok' : 'bad'}`} />{connected ? 'Live' : 'Reconnecting'}</span>
         <button onClick={openProjectionWindow}>Open projection ↗</button>
-        {moving && <button className="stop" onClick={() => api.stop()}>■ STOP</button>}
+        <button className="stop" onClick={() => api.stop().catch((e) => window.alert(e.message))}>■ STOP</button>
       </header>
       <nav className="tabs">
         {TABS.map(([id, num, label]) => (

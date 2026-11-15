@@ -62,7 +62,11 @@ export type Recording = {
   startCell?: Cell; graded?: boolean;
 };
 
+export type CameraStatus = { role: string; generation: number; calibrated: boolean; ready: boolean; error: string | null; resolution: number[] | null; timestampMs: number; index: number };
+
 export type Snapshot = {
+  sessionId: string;
+  camera: CameraStatus | null;
   seq: number;
   state: SessionState;
   puzzle: Puzzle;
