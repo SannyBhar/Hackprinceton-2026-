@@ -36,7 +36,7 @@ export type ScannedCard = {
   rawSteps: number | null; stepsConfidence: number | null; markerConfidence: number;
   cropDataUrl: string | null; issues: string[];
 };
-export type ScanResult = { scanId: string; source: string; cards: ScannedCard[]; errors: string[]; needsReview: boolean };
+export type ScanResult = { unitBlocks?: boolean; scanId: string; source: string; cards: ScannedCard[]; errors: string[]; needsReview: boolean };
 
 export type Corner = { x: number; y: number };
 export type ProjectorCalibration = {

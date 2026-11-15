@@ -15,11 +15,8 @@ def build_session(settings: Settings | None = None) -> Session:
         robot = SimulatedRobot()
     if cfg.cards == "opencv":
         from .vision.cards import OpenCvCardRecognizer
-        ocr = None
-        if cfg.ocr:
-            from .vision.ocr import LocalHandwritingOcr
-            ocr = LocalHandwritingOcr()
-        recognizer = OpenCvCardRecognizer(cfg.card_camera, ocr=ocr)
+        # Physical movement blocks no longer contain handwritten distances.
+        recognizer = OpenCvCardRecognizer(cfg.card_camera)
     else:
         recognizer = FixtureCardRecognizer(FIXTURES / "scans")
     if cfg.storage == "sqlite":

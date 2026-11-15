@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import type { Cell, Instruction, Snapshot } from '../api/types';
+import { displayBlocks } from '../api/unitBlocks';
 import { FEEDBACK } from '../board/Board';
 
 export function useAction() {
@@ -77,11 +78,10 @@ export const OP_ICON: Record<string, string> = {
 export function Blocks({ program, active }: { program: Instruction[]; active?: number }) {
   return (
     <div className="blocks">
-      {program.map((ins, i) => (
-        <div key={i} className={`block op-${ins.op} ${i === active ? 'active' : ''}`}>
+      {displayBlocks(program).map(({instruction: ins, sourceIndex}, i) => (
+        <div key={i} className={`block op-${ins.op} ${sourceIndex === active ? 'active' : ''}`}>
           <span className="icon">{OP_ICON[ins.op]}</span>
           <span>{ins.op}</span>
-          {ins.steps != null && <span className="steps">{ins.steps}</span>}
         </div>
       ))}
     </div>

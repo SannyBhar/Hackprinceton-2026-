@@ -1,3 +1,5 @@
+> **2026-11-15 card-format update:** Physical cards now use 2-inch ArUco DICT_4X4_1000 IDs 0/1/2/3 for FORWARD/BACKWARD/RIGHT/LEFT, with one cell per translation block and repeated blocks for longer movement. The handwritten-distance/OCR requirements below describe the superseded format. See [current unit-block contracts and printing](UNIT_BLOCKS.md).
+
 # Grassroot — Unified Project Architecture & MVP Specification
 
 **Project:** Grassroot (formerly CodeAnywhere)  
